@@ -1,22 +1,22 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, OneToMany } from "typeorm";
-import { Project } from "./Project";
+import { Project } from "./Projects";
 
 
-@Entity()   // 이 클래스가 DB 테이블임을 명시
+@Entity('users')   // 이 클래스가 DB 테이블임을 명시
 export class User {
     @PrimaryGeneratedColumn()   // 자동 증가하는 PK (id)
     id!: number;
 
-    @Column()   // 일반 컬럼
+    @Column({ unique: true, nullable: false })   // nullable 디폴트 옵션은 false
     email!: string;
 
-    @Column()
+    @Column()   // 일반 컬럼
     password!: string;
 
     @Column()
     username!: string;
 
-    @CreateDateColumn()
+    @CreateDateColumn({ type: 'timestamp' })
     createdAt!: Date;
 
     @OneToMany(() => Project, (project) => project.user)

@@ -1,9 +1,9 @@
 import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn } from "typeorm";
-import { Paragraph } from "./Paragraph";
-import { User } from "./User";
+import { Paragraph } from "./Paragraphs";
+import { User } from "./Users";
 
 
-@Entity()
+@Entity('projects')
 export class Project {
     @PrimaryGeneratedColumn()
     id!: number;
@@ -11,26 +11,26 @@ export class Project {
     @Column()
     title!: string;
 
-    @Column()
-    description!: string;
+    @Column({ nullable: true })
+    description?: string;
 
-    @Column()
-    genre!: string;
+    @Column({ nullable: true })
+    genre?: string;
 
-    @Column()
-    synopsis!: string;
+    @Column({ type: 'text', nullable: true })
+    synopsis?: string;
 
-    @Column()
-    lorebook!: string;
+    @Column({ type: 'text', nullable: true })
+    lorebook?: string;
 
-    @CreateDateColumn()
+    @CreateDateColumn({ type: 'timestamp' })
     createdAt!: Date;
 
-    @UpdateDateColumn()
-    updatedAt!: Date;
+    @UpdateDateColumn({ type: 'timestamp', nullable: true })
+    updatedAt?: Date;
 
     @ManyToOne(() => User, (user) => user.projects,
-        { onDelete: 'CASCADE' })
+        { onDelete: 'CASCADE', nullable: false })
     @JoinColumn({ name: 'user_id', referencedColumnName: 'id' })  // 조인컬럼 설정(생략 가능)
     user!: User;
 
