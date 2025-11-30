@@ -366,6 +366,70 @@ npx typeorm migration:run
 
 ---
 
+### 1-11. MVP: AI Writing Core (Immediate)
+**목표**: DB 설정 직후, 복잡한 로직 없이 OpenAI API 연동을 최우선으로 확인합니다.
+
+#### 1) 패키지 설치
+```bash
+npm install openai
+```
+
+#### 2) `src/services/aiService.ts` (MVP 버전)
+```typescript
+import OpenAI from 'openai';
+import dotenv from 'dotenv';
+
+dotenv.config();
+
+const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+export async function generateText(prompt: string): Promise<string> {
+  try {
+    const response = await client.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: 'You are a helpful assistant for a novelist.' },
+        { role: 'user', content: prompt },
+      ],
+      max_tokens: 500,
+    });
+    return response.choices[0].message.content || '';
+  } catch (error) {
+    console.error('OpenAI API Error:', error);
+    throw new Error('Failed to generate text');
+  }
+}
+```
+
+#### 3) `src/routes/testRoutes.ts` (임시 테스트용)
+```typescript
+import { Router } from 'express';
+import { generateText } from '../services/aiService';
+
+export const testRouter = Router();
+
+testRouter.post('/ai', async (req, res) => {
+  try {
+    const { prompt } = req.body;
+    const result = await generateText(prompt);
+    res.json({ result });
+  } catch (error) {
+    res.status(500).json({ error: 'AI generation failed' });
+  }
+});
+```
+
+#### 4) `src/index.ts`에 추가
+```typescript
+// ... imports
+import { testRouter } from './routes/testRoutes';
+
+// ... app setup
+app.use('/api/test', testRouter);
+```
+
+---
+
 ## 2. Week 2 - AI 통합 & 글쓰기 로직
 
 ### 2-1. OpenAI 세팅
@@ -399,7 +463,7 @@ export async function generateNextParagraph(project: Project, paragraphs: Paragr
   });
 
   const response = await client.responses.create({
-    model: 'gpt-3.5-turbo',
+    model: 'gpt-4o-mini',
     input: [
       { role: 'system', content: '당신은 협업 소설 작가입니다.' },
       { role: 'user', content: prompt },
@@ -554,10 +618,11 @@ router.use('/writing', writingRouter);
 
 ## 3. Week 3 - Frontend 구현
 
-### 3-1. CRA 초기화
+### 3-1. Vite 프로젝트 초기화
 ```bash
 cd ../frontend
-npx create-react-app . --template typescript
+npm create vite@latest . -- --template react-ts
+npm install
 npm install axios react-router-dom
 npm install @types/react-router-dom
 npm install -D tailwindcss postcss autoprefixer

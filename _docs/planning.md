@@ -33,7 +33,7 @@
 - **Styling**: Tailwind CSS 3 + PostCSS (custom 프리셋)
 
 ### AI
-- **Primary**: OpenAI GPT API (GPT-3.5-turbo)
+- **Primary**: OpenAI GPT API (GPT-4o-mini)
 - **Alternative**: Anthropic Claude API
 
 ### DevOps
@@ -143,99 +143,6 @@ Paragraph
 - [ ] 글쓰기 화면 우측 패널 탭 전환 레이아웃
 - [ ] "AI 컨텍스트에 포함" 토글 및 반영 여부 시각화
 - [ ] 백엔드 API: `PUT /api/projects/:id/context` (synopsis, lorebook)
-- [ ] 컨텍스트 버전 히스토리(최근 5개) 저장
-
----
-
-## 📅 4주 개발 일정
-
-### Week 1: 환경 설정 & 기본 구조
-**목표**: 개발 환경 구축 및 데이터베이스 설계 완료
-
-#### Day 1-2: Backend 초기 설정
-- [ ] Node.js + Express + TypeScript 프로젝트 초기화
-- [ ] 필요한 패키지 설치
-  - express, typescript, ts-node, @types/node, @types/express
-  - typeorm, mysql2 (MariaDB 드라이버), reflect-metadata
-  - dotenv, cors, @types/cors
-- [ ] tsconfig.json 설정
-- [ ] 기본 서버 구동 확인
-- [ ] 환경 변수 설정 (.env)
-
-```bash
-# Backend 초기화 명령어
-mkdir writing-ai-backend
-cd writing-ai-backend
-npm init -y
-npm install express typescript ts-node @types/node @types/express
-npm install typeorm mysql2 reflect-metadata   # mysql2 패키지가 MariaDB에도 사용됨
-npm install dotenv cors @types/cors
-npm install -D nodemon
-npx tsc --init
-```
-
-#### Day 3-4: 데이터베이스 설계
-- [ ] MariaDB 데이터베이스 생성
-- [ ] TypeORM 연결 설정
-- [ ] Entity 정의
-  - User Entity
-  - Project Entity
-  - Paragraph Entity
-- [ ] 관계 설정 (OneToMany, ManyToOne)
-- [ ] 마이그레이션 생성 및 실행
-
-**파일 구조**:
-```
-src/
-├── entity/
-│   ├── User.ts
-│   ├── Project.ts
-│   └── Paragraph.ts
-├── data-source.ts
-└── index.ts
-```
-
-#### Day 5-7: 기본 API 엔드포인트
-- [ ] 라우터 구조 설계
-- [ ] Project CRUD API
-  - POST /api/projects (프로젝트 생성)
-  - GET /api/projects (프로젝트 목록)
-  - GET /api/projects/:id (프로젝트 상세)
-  - PUT /api/projects/:id (프로젝트 수정)
-  - DELETE /api/projects/:id (프로젝트 삭제)
-- [ ] Postman/Insomnia로 API 테스트
-- [ ] 에러 핸들링 미들웨어 추가
-
-**파일 구조**:
-```
-src/
-├── routes/
-│   ├── projectRoutes.ts
-│   └── index.ts
-├── controllers/
-│   └── projectController.ts
-└── middleware/
-    └── errorHandler.ts
-```
-
----
-
-### Week 2: AI 통합 & 핵심 로직
-**목표**: OpenAI API 통합 및 AI 글쓰기 기능 구현
-
-#### Day 1-3: OpenAI API 통합
-- [ ] OpenAI API 키 발급
-- [ ] openai 패키지 설치
-- [ ] AI Service 클래스 작성
-  - 프롬프트 엔지니어링
-  - 컨텍스트 관리 로직
-  - 토큰 제한 처리
-- [ ] 기본 AI 응답 생성 테스트
-
-```bash
-npm install openai
-```
-
 **핵심 파일**:
 ```
 src/
@@ -280,34 +187,6 @@ src/
 - [ ] 응답 시간 최적화
 - [ ] API 레이트 리미팅
 
----
-
-### Week 3: Frontend 개발
-**목표**: React 애플리케이션 개발 및 UI 구현
-
-#### Day 1-2: React 프로젝트 초기화
-- [ ] Create React App (TypeScript 템플릿)
-- [ ] 필요한 패키지 설치
-  - axios, react-router-dom
-  - @types/react-router-dom
-- [ ] Tailwind CSS 설치 & 설정
-  - `npm install -D tailwindcss postcss autoprefixer`
-  - `npx tailwindcss init -p`
-  - `tailwind.config.js`에 색상/폰트 토큰 정의
-  - `src/index.css`에 `@tailwind base; @tailwind components; @tailwind utilities;`
-- [ ] 기본 라우팅 구조
-- [ ] API 연결 설정 (axios 인스턴스)
-- [ ] 프록시 설정 (개발 환경)
-
-```bash
-npx create-react-app writing-ai-frontend --template typescript
-cd writing-ai-frontend
-npm install axios react-router-dom
-```
-
-**파일 구조**:
-```
-src/
 ├── api/
 │   └── client.ts
 ├── pages/
@@ -650,7 +529,7 @@ function buildContext(
 #### API 호출 설정
 ```typescript
 const completionOptions = {
-  model: 'gpt-3.5-turbo',
+  model: 'gpt-4o-mini',
   temperature: 0.8,        // 창의성 (0.0-2.0)
   max_tokens: 500,         // 최대 응답 길이
   top_p: 0.9,             // 다양성
