@@ -293,6 +293,10 @@ Week 1: █░░░░░░░░░░░░ 2%
 **해결**: 
 
 **참고 링크**:
+- OpenAI API
+  - [API 문서](https://platform.openai.com/docs)
+  - [Playground](https://platform.openai.com/playground)
+  - [Best Practices](https://platform.openai.com/docs/guides/prompt-engineering)
 
 
 #### 📌 내일 할 일

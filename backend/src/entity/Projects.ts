@@ -20,8 +20,8 @@ export class Project {
     @Column({ type: 'text', nullable: true })
     synopsis?: string;
 
-    @Column({ type: 'text', nullable: true })
-    lorebook?: string;
+    @Column({ type: 'json', nullable: true })
+    lorebook?: any[] | null;
 
     @CreateDateColumn({ type: 'timestamp' })
     createdAt!: Date;
@@ -36,26 +36,4 @@ export class Project {
 
     @OneToMany(() => Paragraph, (paragraph) => paragraph.project)   // OneToMany 연결(생략 가능)
     paragraphs!: Paragraph[];
-
-    // constructor(
-    //     id: number,
-    //     title: string,
-    //     description: string,
-    //     genre: string,
-    //     synopsis: string,
-    //     lorebook: string,
-    //     createdAt: Date,
-    //     updatedAt: Date,
-    //     paragraphs: Paragraph[]
-    // ) {
-    //     this.id = id;
-    //     this.title = title;
-    //     this.description = description;
-    //     this.genre = genre;
-    //     this.synopsis = synopsis;
-    //     this.lorebook = lorebook;
-    //     this.createdAt = createdAt;
-    //     this.updatedAt = updatedAt;
-    //     this.paragraphs = paragraphs;
-    // }
 }

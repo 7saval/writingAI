@@ -35,19 +35,19 @@ docker run -d \
 ### 0-4. 공용 .env 템플릿
 `backend/.env.example`
 ```env
-PORT=5000
-NODE_ENV=development
+PORT=5000 # 서버 포트 번호
+NODE_ENV=development # 개발 환경 설정
 
-DB_HOST=localhost
-DB_PORT=3306
-DB_USERNAME=root
-DB_PASSWORD=devpass
-DB_DATABASE=writing_ai_db
+DB_HOST=localhost # 데이터베이스 호스트
+DB_PORT=3306 # 데이터베이스 포트
+DB_USERNAME=root # 데이터베이스 사용자 이름
+DB_PASSWORD=devpass # 데이터베이스 비밀번호
+DB_DATABASE=writing_ai_db # 데이터베이스 이름
 
-OPENAI_API_KEY=replace_me
-JWT_SECRET=change_me
-JWT_EXPIRES_IN=7d
-CORS_ORIGIN=http://localhost:3000
+OPENAI_API_KEY=replace_me # OpenAI API 키 (발급받은 키로 교체 필요)
+JWT_SECRET=change_me # JWT 토큰 서명 비밀키 (임의의 문자열로 변경 필요)
+JWT_EXPIRES_IN=7d # JWT 토큰 만료 기간 (7일)
+CORS_ORIGIN=http://localhost:3000 # 허용할 프론트엔드 주소
 ```
 복사해서 `.env`로 사용합니다.
 
@@ -87,12 +87,12 @@ npx tsc --init
 ### 1-3. `package.json` 스크립트
 ```json
 "scripts": {
-  "dev": "concurrently \"npm run dev:server\" \"npm run dev:typecheck\"",
-  "dev:server": "nodemon --watch src --exec ts-node src/index.ts",
-  "dev:typecheck": "tsc --noEmit",
-  "build": "tsc",
-  "start": "node dist/index.js",
-  "typeorm": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js"
+  "dev": "concurrently \"npm run dev:server\" \"npm run dev:typecheck\"", // 서버 실행과 타입 체크를 동시에 수행
+  "dev:server": "nodemon --watch src --exec ts-node src/index.ts", // 소스 코드 변경 감지하여 서버 재시작
+  "dev:typecheck": "tsc --noEmit", // 타입 에러 검사 (파일 생성 안 함)
+  "build": "tsc", // TypeScript 코드를 JavaScript로 컴파일
+  "start": "node dist/index.js", // 컴파일된 프로덕션 코드 실행
+  "typeorm": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js" // TypeORM CLI 실행 스크립트
 }
 ```
 
@@ -128,15 +128,15 @@ import { Project } from './entity/Project';
 import { Paragraph } from './entity/Paragraph';
 
 export const AppDataSource = new DataSource({
-  type: 'mysql',
+  type: 'mysql', // 데이터베이스 타입
   host: process.env.DB_HOST,
   port: Number(process.env.DB_PORT ?? 3306),
   username: process.env.DB_USERNAME,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_DATABASE,
-  entities: [User, Project, Paragraph],
-  synchronize: false,            // 운영 전환 시 true → false
-  logging: false,
+  entities: [User, Project, Paragraph], // 사용할 엔티티 목록
+  synchronize: false,            // 운영 전환 시 true → false (테이블 자동 생성 여부)
+  logging: false, // 쿼리 로그 출력 여부
 });
 
 export async function initDataSource() {
@@ -153,12 +153,12 @@ export async function initDataSource() {
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, OneToMany } from 'typeorm';
 import { Project } from './Project';
 
-@Entity()
+@Entity() // 이 클래스가 데이터베이스 테이블임을 명시
 export class User {
-  @PrimaryGeneratedColumn()
+  @PrimaryGeneratedColumn() // 자동으로 1씩 증가하는 ID
   id: number;
 
-  @Column({ unique: true })
+  @Column({ unique: true }) // 중복 불가능한 이메일 컬럼
   email: string;
 
   @Column()
@@ -167,10 +167,10 @@ export class User {
   @Column()
   username: string;
 
-  @CreateDateColumn()
+  @CreateDateColumn() // 생성 시 자동으로 현재 시간 저장
   createdAt: Date;
 
-  @OneToMany(() => Project, (project) => project.user)
+  @OneToMany(() => Project, (project) => project.user) // 1:N 관계 설정 (한 유저는 여러 프로젝트를 가짐)
   projects: Project[];
 }
 ```
@@ -186,31 +186,31 @@ export class Project {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @ManyToOne(() => User, (user) => user.projects, { onDelete: 'CASCADE' })
+  @ManyToOne(() => User, (user) => user.projects, { onDelete: 'CASCADE' }) // N:1 관계 (유저 삭제 시 프로젝트도 삭제)
   user: User;
 
   @Column()
   title: string;
 
-  @Column({ type: 'enum', enum: ['fantasy', 'romance', 'thriller', 'sf'], default: 'fantasy' })
+  @Column({ type: 'enum', enum: ['fantasy', 'romance', 'thriller', 'sf'], default: 'fantasy' }) // 장르 제한
   genre: string;
 
-  @Column({ type: 'text', nullable: true })
+  @Column({ type: 'text', nullable: true }) // 긴 텍스트 허용, null 가능
   description: string | null;
 
   @Column({ type: 'text', nullable: true })
   synopsis: string | null;
 
-  @Column({ type: 'longtext', nullable: true })
+  @Column({ type: 'longtext', nullable: true }) // 아주 긴 텍스트 (JSON 저장용)
   lorebook: string | null; // JSON.stringify된 값
 
   @CreateDateColumn()
   createdAt: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn() // 수정 시 자동으로 현재 시간 업데이트
   updatedAt: Date;
 
-  @OneToMany(() => Paragraph, (paragraph) => paragraph.project)
+  @OneToMany(() => Paragraph, (paragraph) => paragraph.project) // 1:N 관계 (프로젝트는 여러 단락을 가짐)
   paragraphs: Paragraph[];
 }
 ```
@@ -225,17 +225,17 @@ export class Paragraph {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @ManyToOne(() => Project, (project) => project.paragraphs, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Project, (project) => project.paragraphs, { onDelete: 'CASCADE' }) // 프로젝트 삭제 시 단락도 삭제
   project: Project;
 
   @Column({ type: 'text' })
   content: string;
 
-  @Column({ type: 'enum', enum: ['user', 'ai'] })
+  @Column({ type: 'enum', enum: ['user', 'ai'] }) // 작성자 구분
   author: 'user' | 'ai';
 
   @Column()
-  orderIndex: number;
+  orderIndex: number; // 단락 순서
 
   @CreateDateColumn()
   createdAt: Date;
@@ -245,7 +245,7 @@ export class Paragraph {
 ### 1-7. Express 앱 진입점
 `src/index.ts`
 ```typescript
-import 'dotenv/config';
+import 'dotenv/config'; // .env 파일 로드
 import express from 'express';
 import cors from 'cors';
 import { initDataSource } from './data-source';
@@ -253,13 +253,13 @@ import { router } from './routes';
 import { errorHandler } from './middleware/errorHandler';
 
 async function bootstrap() {
-  await initDataSource();
+  await initDataSource(); // DB 연결
 
   const app = express();
-  app.use(cors({ origin: process.env.CORS_ORIGIN, credentials: true }));
-  app.use(express.json());
-  app.use('/api', router);
-  app.use(errorHandler);
+  app.use(cors({ origin: process.env.CORS_ORIGIN, credentials: true })); // CORS 설정 (프론트엔드 접근 허용)
+  app.use(express.json()); // JSON 요청 본문 파싱
+  app.use('/api', router); // API 라우터 등록
+  app.use(errorHandler); // 에러 핸들러 등록 (맨 마지막에 위치)
 
   const port = Number(process.env.PORT ?? 5000);
   app.listen(port, () => console.log(`🚀 Server listening on ${port}`));
@@ -267,7 +267,7 @@ async function bootstrap() {
 
 bootstrap().catch((err) => {
   console.error('Server bootstrap failed', err);
-  process.exit(1);
+  process.exit(1); // 에러 발생 시 프로세스 종료
 });
 ```
 
@@ -300,6 +300,7 @@ import { Request, Response, NextFunction } from 'express';
 import { AppDataSource } from '../data-source';
 import { Project } from '../entity/Project';
 
+// 프로젝트 생성
 export async function createProject(req: Request, res: Response, next: NextFunction) {
   try {
     const repo = AppDataSource.getRepository(Project);
@@ -308,33 +309,35 @@ export async function createProject(req: Request, res: Response, next: NextFunct
       genre: req.body.genre ?? 'fantasy',
       description: req.body.description,
       synopsis: req.body.synopsis ?? '',
-      lorebook: JSON.stringify(req.body.lorebook ?? []),
+      lorebook: JSON.stringify(req.body.lorebook ?? []), // 배열을 JSON 문자열로 변환하여 저장
     });
 
     await repo.save(project);
     res.status(201).json(project);
   } catch (error) {
-    next(error);
+    next(error); // 에러 핸들러로 전달
   }
 }
 
+// 프로젝트 목록 조회
 export async function getProjects(req: Request, res: Response, next: NextFunction) {
   try {
     const repo = AppDataSource.getRepository(Project);
-    const list = await repo.find({ order: { createdAt: 'DESC' } });
+    const list = await repo.find({ order: { createdAt: 'DESC' } }); // 최신순 정렬
     res.json(list);
   } catch (error) {
     next(error);
   }
 }
 
+// 프로젝트 상세 조회
 export async function getProjectDetail(req: Request, res: Response, next: NextFunction) {
   try {
     const repo = AppDataSource.getRepository(Project);
     const project = await repo.findOne({
       where: { id: Number(req.params.id) },
-      relations: ['paragraphs'],
-      order: { paragraphs: { orderIndex: 'ASC' } },
+      relations: ['paragraphs'], // 연관된 단락들도 함께 조회
+      order: { paragraphs: { orderIndex: 'ASC' } }, // 단락 순서대로 정렬
     });
 
     if (!project) return res.status(404).json({ message: 'Project not found' });
@@ -386,12 +389,12 @@ const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 export async function generateText(prompt: string): Promise<string> {
   try {
     const response = await client.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: 'gpt-4o-mini', // 사용할 모델
       messages: [
-        { role: 'system', content: 'You are a helpful assistant for a novelist.' },
-        { role: 'user', content: prompt },
+        { role: 'system', content: 'You are a helpful assistant for a novelist.' }, // 시스템 역할 설정
+        { role: 'user', content: prompt }, // 사용자 입력
       ],
-      max_tokens: 500,
+      max_tokens: 500, // 최대 생성 토큰 수
     });
     return response.choices[0].message.content || '';
   } catch (error) {
@@ -454,27 +457,30 @@ interface ContextOptions {
   loreFocusTags?: string[];
 }
 
+// 다음 단락 생성 함수
 export async function generateNextParagraph(project: Project, paragraphs: Paragraph[]) {
+  // 프롬프트 구성
   const prompt = buildContext(project, paragraphs, {
     includeSynopsis: true,
     includeLorebook: true,
     includeDescription: true,
-    maxParagraphs: 8,
+    maxParagraphs: 8, // 최근 8개 단락만 참조
   });
 
-  const response = await client.responses.create({
+  const response = await client.chat.completions.create({
     model: 'gpt-4o-mini',
-    input: [
+    messages: [
       { role: 'system', content: '당신은 협업 소설 작가입니다.' },
       { role: 'user', content: prompt },
     ],
-    temperature: 0.8,
-    max_output_tokens: 500,
+    temperature: 0.8, // 창의성 조절 (높을수록 창의적)
+    max_tokens: 500,
   });
 
-  return response.output_text;
+  return response.choices[0].message.content || '';
 }
 
+// 컨텍스트(프롬프트) 빌더
 function buildContext(project: Project, paragraphs: Paragraph[], options: ContextOptions) {
   let context = '';
 
@@ -489,6 +495,7 @@ function buildContext(project: Project, paragraphs: Paragraph[], options: Contex
     context += `[Background]\n${project.description}\n\n`;
   }
 
+  // 최근 단락들을 대화 형식으로 구성
   const recent = paragraphs.slice(-options.maxParagraphs).map((p) => `${p.author.toUpperCase()}: ${p.content}`);
   context += recent.join('\n\n');
 
@@ -496,6 +503,7 @@ function buildContext(project: Project, paragraphs: Paragraph[], options: Contex
   return context;
 }
 
+// 설정집 포맷팅 (태그 필터링 포함)
 function formatLore(notes: any[], tags?: string[]) {
   return notes
     .filter((note) => (!tags || tags.length === 0 ? true : note.tags.some((tag: string) => tags.includes(tag))))
@@ -518,6 +526,7 @@ export async function writeWithAi(req: Request, res: Response, next: NextFunctio
     const projectRepo = AppDataSource.getRepository(Project);
     const paragraphRepo = AppDataSource.getRepository(Paragraph);
 
+    // 프로젝트와 기존 단락 조회
     const project = await projectRepo.findOne({
       where: { id: Number(req.params.id) },
       relations: ['paragraphs'],
@@ -525,6 +534,7 @@ export async function writeWithAi(req: Request, res: Response, next: NextFunctio
 
     if (!project) return res.status(404).json({ message: 'Project not found' });
 
+    // 1. 유저가 작성한 단락 저장
     const userParagraph = paragraphRepo.create({
       project,
       content: req.body.content,
@@ -533,7 +543,10 @@ export async function writeWithAi(req: Request, res: Response, next: NextFunctio
     });
     await paragraphRepo.save(userParagraph);
 
+    // 2. AI가 다음 단락 생성
     const aiText = await generateNextParagraph(project, [...project.paragraphs, userParagraph]);
+    
+    // 3. AI 단락 저장
     const aiParagraph = paragraphRepo.create({
       project,
       content: aiText.trim(),
@@ -701,6 +714,7 @@ interface Project {
 export function ProjectList() {
   const [projects, setProjects] = useState<Project[]>([]);
 
+  // 컴포넌트 마운트 시 프로젝트 목록 불러오기
   useEffect(() => {
     apiClient.get('/projects').then((res) => setProjects(res.data));
   }, []);
@@ -746,22 +760,25 @@ interface Paragraph {
 }
 
 export function WritingSession() {
-  const { projectId } = useParams();
+  const { projectId } = useParams(); // URL에서 projectId 가져오기
   const [paragraphs, setParagraphs] = useState<Paragraph[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
+  // 초기 데이터 로드
   useEffect(() => {
     apiClient.get(`/projects/${projectId}`).then((res) => setParagraphs(res.data.paragraphs));
   }, [projectId]);
 
+  // 단락 제출 핸들러
   const handleSubmit = async () => {
     if (!input.trim()) return;
     setIsLoading(true);
     try {
+      // 유저 입력 전송 및 AI 응답 수신
       const res = await apiClient.post(`/writing/${projectId}/write`, { content: input });
       setParagraphs((prev) => [...prev, res.data.userParagraph, res.data.aiParagraph]);
-      setInput('');
+      setInput(''); // 입력창 초기화
     } finally {
       setIsLoading(false);
     }
@@ -769,6 +786,7 @@ export function WritingSession() {
 
   return (
     <div className="mx-auto grid max-w-6xl gap-6 px-6 py-10 lg:grid-cols-[65%_35%]">
+      {/* 메인 글쓰기 영역 */}
       <section className="flex flex-col rounded-2xl border border-border bg-white shadow-sm">
         <div className="flex-1 space-y-4 overflow-y-auto p-6">
           {paragraphs.map((p) => (
@@ -785,6 +803,7 @@ export function WritingSession() {
             </article>
           ))}
         </div>
+        {/* 입력 영역 */}
         <div className="border-t border-border p-6">
           <textarea
             value={input}
@@ -797,7 +816,7 @@ export function WritingSession() {
           </button>
         </div>
       </section>
-
+      {/* 우측 사이드바 (설정집) */}
       <StoryContextPanel projectId={Number(projectId)} />
     </div>
   );
@@ -823,6 +842,7 @@ export function StoryContextPanel({ projectId }: { projectId: number }) {
   const [lore, setLore] = useState<LoreNote[]>([]);
   const [timer, setTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
 
+  // 데이터 로드
   useEffect(() => {
     apiClient.get(`/projects/${projectId}/context`).then((res) => {
       setSynopsis(res.data.synopsis);
@@ -830,6 +850,7 @@ export function StoryContextPanel({ projectId }: { projectId: number }) {
     });
   }, [projectId]);
 
+  // 자동 저장 (디바운싱 적용: 입력 멈춘 후 2초 뒤 저장)
   const debouncedSave = (payload: any) => {
     if (timer) clearTimeout(timer);
     const nextTimer = setTimeout(() => {
@@ -844,6 +865,7 @@ export function StoryContextPanel({ projectId }: { projectId: number }) {
         <h2 className="text-lg font-semibold text-slate-900">시놉시스 & 설정집</h2>
         <span className="text-xs text-slate-500">자동 저장 (2초)</span>
       </header>
+      {/* 시놉시스 입력 */}
       <section className="space-y-2">
         <label className="text-sm font-medium text-slate-600">시놉시스</label>
         <textarea
@@ -855,6 +877,7 @@ export function StoryContextPanel({ projectId }: { projectId: number }) {
           }}
         />
       </section>
+      {/* 설정집 리스트 */}
       <section className="mt-6 space-y-4">
         <div className="flex items-center justify-between">
           <label className="text-sm font-medium text-slate-600">설정집</label>
@@ -949,7 +972,7 @@ import { User } from '../entity/User';
 export async function register(req: Request, res: Response, next: NextFunction) {
   try {
     const repo = AppDataSource.getRepository(User);
-    const hashed = await bcrypt.hash(req.body.password, 10);
+    const hashed = await bcrypt.hash(req.body.password, 10); // 비밀번호 해싱 (보안 강화)
     const user = repo.create({ email: req.body.email, username: req.body.username, password: hashed });
     await repo.save(user);
     res.status(201).json({ id: user.id });
@@ -964,9 +987,11 @@ export async function login(req: Request, res: Response, next: NextFunction) {
     const user = await repo.findOneBy({ email: req.body.email });
     if (!user) return res.status(401).json({ message: 'Invalid credentials' });
 
+    // 비밀번호 검증
     const match = await bcrypt.compare(req.body.password, user.password);
     if (!match) return res.status(401).json({ message: 'Invalid credentials' });
 
+    // JWT 토큰 발급
     const token = jwt.sign({ sub: user.id }, process.env.JWT_SECRET!, { expiresIn: process.env.JWT_EXPIRES_IN });
     res.json({ token });
   } catch (error) {
@@ -979,11 +1004,11 @@ export async function login(req: Request, res: Response, next: NextFunction) {
 `src/utils/auth.ts`
 ```typescript
 export function setToken(token: string) {
-  localStorage.setItem('token', token);
+  localStorage.setItem('token', token); // 로컬 스토리지에 토큰 저장
 }
 
 export function getToken() {
-  return localStorage.getItem('token');
+  return localStorage.getItem('token'); // 저장된 토큰 가져오기
 }
 ```
 
@@ -992,7 +1017,7 @@ export function getToken() {
 import { getToken } from '../utils/auth';
 apiClient.interceptors.request.use((config) => {
   const token = getToken();
-  if (token) config.headers.Authorization = `Bearer ${token}`;
+  if (token) config.headers.Authorization = `Bearer ${token}`; // 헤더에 토큰 추가
   return config;
 });
 ```
