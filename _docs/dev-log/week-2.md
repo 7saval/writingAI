@@ -113,17 +113,19 @@ Week 2: ██░░░░░░░░░░░ 10%
 
 #### 🎯 오늘의 목표
 - AI 글쓰기 핵심 기능
-  - [ ] 글쓰기 세션 API (/writing) 생성
-  - [ ] 컨텍스트 관리 구현 (시놉시스/설정집)
+  - [x] 글쓰기 세션 API (/writing) 생성
+  - [x] 컨텍스트 관리 구현 (시놉시스/설정집)
 
 #### ✅ 완료한 작업
 - ✅ 글쓰기 세션 API (/writing) 생성
 - ✅ 프로젝트 API (/projects) 생성
+- ✅ 컨텍스트 관리 구현 (시놉시스/설정집)
+- ✅ postman API 테스트
   
   
   
 #### 💡 배운 것
-- typeORM에서 find findone findoneBy 차이
+- typeORM에서 find, findone, findoneBy 차이
   - 여러 개를 가져와야 한다면? 👉 find
   - 하나만 가져오는데, Join(relations)이나 정렬, 특정 컬럼 선택이 필요하다면? 👉 findOne
   - 하나만 가져오는데, 단순히 **조건(where)**만 필요하다면? 👉 findOneBy
@@ -135,7 +137,7 @@ Week 2: ██░░░░░░░░░░░ 10%
 | findOne	   | Entity \| null	| 조건에 맞는 첫 번째 데이터만 가져옵니다. |	where, relations, select 등 모든 옵션을 사용할 수 있습니다. |
 | findOneBy	  | Entity \| null	| 조건에 맞는 첫 번째 데이터만 가져옵니다. |	where 조건만 간단히 넣을 수 있는 단축 메서드입니다. |
 
-- typeORM create save 차이
+- typeORM create, save 차이
   - create: 데이터베이스에 저장하기 전, 엔터티 인스턴스를 메모리 상에서 생성하는 데 사용
   - save: 데이터베이스에 저장하는 데 사용
 - express에서 에러 핸들링
@@ -146,24 +148,56 @@ Week 2: ██░░░░░░░░░░░ 10%
 - 
 
 #### 🔧 해결한 문제
-**문제**: 
+**문제**: createdAt과 updatedAt이 한국 시간으로 표기되지 않음
 
 **원인**: 
-
-**과정**: 
+1) DB 타임존 설정이 시스템(UTC)으로 되어 있음. 
+2) typeORM 설정에서 dateStrings 설정이 안 되어 있음
 
 **해결**: 
+1) DB 타임존 설정을 한국 시간으로 변경
+2) typeORM 설정에서 dateStrings: true로 설정
+
+```sql
+-- 전체 데이터베이스 timezone 설정
+SET GLOBAL time_zone = 'Asia/Seoul';
+
+-- 현재 session timezone 설정
+SET time_zone = 'Asia/Seoul';
+
+-- 타임존 설정값 조회
+SELECT @@global.time_zone, @@session.time_zone;
+```
+
+```typescript
+export const AppDataSource = new DataSource({
+    type: 'mysql',
+    host: process.env.DB_HOST,
+    port: Number(process.env.DB_PORT ?? 3307),
+    username: process.env.DB_USERNAME,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_DATABASE,
+    entities: [User, Project, Paragraph],
+    synchronize: true,     // 운영 전환 시 true → false
+    logging: true,
+    dateStrings: true,  // 날짜 형식대로 표기
+});
+```
 
 **참고 링크**:
 
 #### 📌 내일 할 일
-- AI 글쓰기 핵심 기능
-  - [ ] 컨텍스트 관리 구현 (시놉시스/설정집)
+- Vite React 프로젝트 초기화
+- Tailwind CSS 및 스타일링 설정
+- 프로젝트 목록 페이지 구현
+- 글쓰기(라이팅) 세션 UI 구현
+- 프론트엔드와 API 연동
 
 #### 🚨 이슈/질문
-- 
+- user가 쓴 내용에 이어서 ai가 써주길 바랐는데, user가 쓴 내용을 디벨롭하는 방향으로 ai가 써주고 있음
+- ai가 쓴 내용이 너무 급발진. 시놉과 설정을 참고하는데 한 순간에 결말까지 가버림
 
 #### 📊 진행률
-Week 2: ██░░░░░░░░░░░ 10%
+Week 2: ██░░░░░░░░░░░ 15%
 
 ---

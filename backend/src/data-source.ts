@@ -14,6 +14,7 @@ export const AppDataSource = new DataSource({
     entities: [User, Project, Paragraph],
     synchronize: true,     // 운영 전환 시 true → false
     logging: true,
+    dateStrings: true,  // 날짜 형식대로 표기
 });
 
 export async function initDataSource() {

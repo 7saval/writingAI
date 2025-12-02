@@ -12,7 +12,7 @@ export async function createProject(req: Request, res: Response, next: NextFunct
             genre: req.body.genre ?? 'fantasy',
             description: req.body.description,
             synopsis: req.body.synopsis ?? '',
-            lorebook: req.body.lorebook ?? '',
+            lorebook: req.body.lorebook ?? [],
         });
         await repo.save(project);
         res.status(StatusCodes.CREATED).json(project);
@@ -56,5 +56,41 @@ export async function getProjectDetail(req: Request, res: Response, next: NextFu
         res.status(StatusCodes.OK).json(project);
     } catch (error) {
         next(error);    // 에러 핸들러로 전달
+    }
+}
+
+// 프로젝트 수정
+export async function updateProject(req: Request, res: Response, next: NextFunction) {
+    try {
+        const repo = AppDataSource.getRepository(Project);
+        const project = await repo.findOneBy({ id: Number(req.params.id) });
+
+        if (!project) {
+            return res.status(StatusCodes.NOT_FOUND).json({ message: 'Project not found' });
+        }
+
+        // 업데이트할 필드만 수정
+        if (req.body.title !== undefined) project.title = req.body.title;
+        if (req.body.genre !== undefined) project.genre = req.body.genre;
+        if (req.body.description !== undefined) project.description = req.body.description;
+        if (req.body.synopsis !== undefined) project.synopsis = req.body.synopsis;
+
+        if (req.body.lorebook !== undefined) {
+            let lorebookData = req.body.lorebook;
+            if (typeof lorebookData === 'string') {
+                try {
+                    lorebookData = JSON.parse(lorebookData);
+                } catch (e) {
+                    console.warn('Failed to parse lorebook JSON string:', e);
+                    lorebookData = [];
+                }
+            }
+            project.lorebook = lorebookData;
+        }
+
+        await repo.save(project);
+        res.status(StatusCodes.OK).json(project);
+    } catch (error) {
+        next(error);
     }
 }

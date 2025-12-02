@@ -30,7 +30,7 @@ export class Project {
     updatedAt?: Date;
 
     @ManyToOne(() => User, (user) => user.projects,
-        { onDelete: 'CASCADE', nullable: false })
+        { onDelete: 'CASCADE', nullable: true })
     @JoinColumn({ name: 'user_id', referencedColumnName: 'id' })  // 조인컬럼 설정(생략 가능)
     user!: User;
 
