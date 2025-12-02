@@ -232,7 +232,7 @@ export class Paragraph {
   content: string;
 
   @Column({ type: 'enum', enum: ['user', 'ai'] }) // 작성자 구분
-  author: 'user' | 'ai';
+  writtenBy: 'user' | 'ai';
 
   @Column()
   orderIndex: number; // 단락 순서
@@ -496,7 +496,7 @@ function buildContext(project: Project, paragraphs: Paragraph[], options: Contex
   }
 
   // 최근 단락들을 대화 형식으로 구성
-  const recent = paragraphs.slice(-options.maxParagraphs).map((p) => `${p.author.toUpperCase()}: ${p.content}`);
+  const recent = paragraphs.slice(-options.maxParagraphs).map((p) => `${p.writtenBy.toUpperCase()}: ${p.content}`);
   context += recent.join('\n\n');
 
   context += '\n\nAI, 다음 단락을 작성해 주세요.';
@@ -538,7 +538,7 @@ export async function writeWithAi(req: Request, res: Response, next: NextFunctio
     const userParagraph = paragraphRepo.create({
       project,
       content: req.body.content,
-      author: 'user',
+      writtenBy: 'user',
       orderIndex: project.paragraphs.length,
     });
     await paragraphRepo.save(userParagraph);
@@ -550,7 +550,7 @@ export async function writeWithAi(req: Request, res: Response, next: NextFunctio
     const aiParagraph = paragraphRepo.create({
       project,
       content: aiText.trim(),
-      author: 'ai',
+      writtenBy: 'ai',
       orderIndex: project.paragraphs.length + 1,
     });
     await paragraphRepo.save(aiParagraph);
@@ -755,7 +755,7 @@ import { StoryContextPanel } from '../components/StoryContextPanel';
 
 interface Paragraph {
   id: number;
-  author: 'user' | 'ai';
+  writtenBy: 'user' | 'ai';
   content: string;
 }
 
@@ -793,11 +793,11 @@ export function WritingSession() {
             <article
               key={p.id}
               className={`rounded-xl border border-border px-4 py-3 ${
-                p.author === 'user' ? 'bg-userBg' : 'bg-aiBg'
+                p.writtenBy === 'user' ? 'bg-userBg' : 'bg-aiBg'
               }`}
             >
               <strong className="text-sm text-slate-500">
-                {p.author === 'user' ? '나' : 'AI'}
+                {p.writtenBy === 'user' ? '나' : 'AI'}
               </strong>
               <p className="mt-1 whitespace-pre-line text-slate-900">{p.content}</p>
             </article>
@@ -1036,7 +1036,7 @@ export async function exportProject(req: Request, res: Response, next: NextFunct
     if (!project) return res.status(404).json({ message: 'Not found' });
 
     const text = project.paragraphs
-      .map((p) => `${p.author === 'user' ? '[User]' : '[AI]'} ${p.content}`)
+      .map((p) => `${p.writtenBy === 'user' ? '[User]' : '[AI]'} ${p.content}`)
       .join('\n\n');
 
     res.setHeader('Content-Type', 'text/plain');

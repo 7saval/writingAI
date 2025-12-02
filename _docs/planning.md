@@ -94,7 +94,7 @@ Paragraph
 ├── id (PK)
 ├── projectId (FK → Project)
 ├── content (text)
-├── author (enum: 'user', 'ai')
+├── writtenBy (enum: 'user', 'ai')
 ├── orderIndex
 └── createdAt
 ```
