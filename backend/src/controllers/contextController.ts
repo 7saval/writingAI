@@ -29,17 +29,23 @@ export async function updateContext(req: Request, res: Response, next: NextFunct
             return res.status(StatusCodes.NOT_FOUND).json({ message: 'Project not found' });
         }
 
-        project.synopsis = req.body.synopsis ?? null;
-        let lorebookData = req.body.lorebook;
-        if (typeof lorebookData === 'string') {
-            try {
-                lorebookData = JSON.parse(lorebookData);
-            } catch (e) {
-                console.warn('Failed to parse lorebook JSON string:', e);
-                lorebookData = [];
-            }
+        // 업데이트할 필드만 수정
+        if (req.body.synopsis !== undefined) {
+            project.synopsis = req.body.synopsis;
         }
-        project.lorebook = lorebookData ?? [];
+
+        if (req.body.lorebook !== undefined) {
+            let lorebookData = req.body.lorebook;
+            if (typeof lorebookData === 'string') {
+                try {
+                    lorebookData = JSON.parse(lorebookData);
+                } catch (e) {
+                    console.warn('Failed to parse lorebook JSON string:', e);
+                    lorebookData = [];
+                }
+            }
+            project.lorebook = lorebookData;
+        }
         await repo.save(project);
 
         res.status(StatusCodes.OK).json({

@@ -12,7 +12,8 @@ export const AppDataSource = new DataSource({
     password: process.env.DB_PASSWORD,
     database: process.env.DB_DATABASE,
     entities: [User, Project, Paragraph],
-    synchronize: true,     // 운영 전환 시 true → false
+    // synchronize: true,     // 운영 전환 시 true → false
+    synchronize: false,     // 스키마 자동 동기화 비활성화 (데이터 보호)
     logging: true,
     dateStrings: true,  // 날짜 형식대로 표기
 });
