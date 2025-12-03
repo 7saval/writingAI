@@ -266,3 +266,148 @@ export const AppDataSource = new DataSource({
 Week 2: ██░░░░░░░░░░░ 15%
 
 ---
+### 📅 2025-12-03 (Day 8)
+
+#### 🎯 오늘의 목표
+- [x] typeORM 마이그레이션 실행
+- [x] Vite React 프로젝트 초기화
+- [x] Tailwind CSS 및 스타일링 설정
+- [ ] 프로젝트 목록 페이지 구현
+- [ ] 글쓰기(라이팅) 세션 UI 구현
+- [ ] 프론트엔드와 API 연동
+
+#### ✅ 완료한 작업
+- ✅ typeORM 마이그레이션 실행
+- ✅ Vite React 프로젝트 초기화
+- ✅ Tailwind CSS 및 스타일링 설정
+  
+  
+  
+#### 💡 배운 것
+1) Vite 환경에서 환경 변수 사용법
+  - Vite 환경에서는 process.env로 환경변수를 가져올 수 없다.   
+  ➡️ import.meta.env 사용
+  ```typescript
+    // baseURL: process.env.REACT_APP_API_URL ?? 'http://localhost:5000/api',
+    baseURL: import.meta.env.VITE_API_URL ?? 'http://localhost:5000/api',
+  ```  
+  - 환경변수 파일(.env) 작성 또한 주의해야 할 사항이 있는데 반드시 변수명 앞에 VITE_ 접두어가 있어야 공개적으로 접근 가능
+  ```
+    VITE_API_URL=http://localhost:5000/api
+  ```  
+
+<br>
+
+2) Tailwind CSS를 사용하여 스타일링하는 방법
+  - Tailwind 기본 모듈 로드 필수 
+    - base(전역 스타일) / components(컴포넌트 스타일) / utilities(유틸리티 스타일)
+  - Tailwind는 CSS를 layer 단위로 관리
+
+
+**새로 알게 된 개념**  
+---
+📚 TypeORM 마이그레이션이란?  
+마이그레이션은 데이터베이스 스키마의 변경 이력을 관리하는 버전 관리 시스템으로 데이터베이스 구조 변경을 추적한다.
+
+🎯 마이그레이션의 용도  
+1. 데이터베이스 스키마 버전 관리
+- 테이블 생성/삭제, 컬럼 추가/수정/삭제 등의 변경 이력을 코드로 관리
+- 팀원들과 동일한 DB 구조를 공유
+2. 안전한 배포
+- 개발 → 스테이징 → 프로덕션 환경으로 DB 변경사항을 안전하게 이동
+- 문제 발생 시 롤백 가능
+3. 데이터 보존
+- synchronize: true는 기존 데이터를 삭제할 수 있지만, 마이그레이션은 데이터를 보존하면서 스키마 변경  
+
+<br>
+🔍 생성된 마이그레이션 파일 구조
+
+```typescript
+export class InitialMigration1764770977727 implements MigrationInterface {
+    // ⬆️ 데이터베이스 스키마 업그레이드
+    public async up(queryRunner: QueryRunner): Promise<void> {
+        // 엔티티와 실제 DB의 차이를 반영하는 SQL 쿼리들
+        await queryRunner.query(`ALTER TABLE ...`);
+    }
+
+    // ⬇️ 변경사항 되돌리기 (롤백)
+    public async down(queryRunner: QueryRunner): Promise<void> {
+        // up()의 반대 작업을 수행하는 SQL 쿼리들
+        await queryRunner.query(`ALTER TABLE ...`);
+    }
+}
+```  
+<br>
+🚀 마이그레이션 사용법  
+
+1️⃣ package.json에 스크립트 추가  
+2️⃣ data-source.ts에 migrations 파일 위치 작성  
+3️⃣ synchronize: false로 설정  
+
+4️⃣ 마이그레이션 실행 (DB에 적용)
+```bash
+npm run migration:run
+```
+동작:
+
+- up() 메서드의 SQL 쿼리들이 실행
+- 데이터베이스에 실제로 변경사항이 적용
+- migrations 테이블에 실행 이력이 기록
+
+언제 사용?
+- 새로운 마이그레이션 파일을 생성한 후
+- 다른 개발자가 만든 마이그레이션을 받았을 때
+- 새로운 환경(스테이징, 프로덕션)에 배포할 때  
+
+5️⃣ 마이그레이션 되돌리기 (롤백)
+```bash
+npm run migration:revert
+```  
+
+동작:
+
+- 가장 최근에 실행된 마이그레이션의 down() 메서드가 실행
+- 한 번 실행할 때마다 하나의 마이그레이션만 되돌린다.
+
+언제 사용?
+- 마이그레이션 실행 후 문제가 발생했을 때
+- 잘못된 스키마 변경을 취소하고 싶을 때  
+
+6️⃣ 새로운 마이그레이션 생성  
+
+```bash
+npm run migration:generate -- ./src/migrations/마이그레이션이름
+```
+
+동작:
+- 엔티티 정의와 실제 DB를 비교
+- 차이점을 자동으로 감지하여 마이그레이션 파일 생성  
+
+언제 사용?
+- 엔티티 파일을 수정한 후 (컬럼 추가, 타입 변경 등)
+
+---
+#### 🔧 해결한 문제
+**문제1**: 
+
+**원인**: 
+
+**해결**: 
+
+
+
+**참고 링크**:
+
+#### 📌 내일 할 일
+- 프로젝트 목록 페이지 구현
+- 글쓰기(라이팅) 세션 UI 구현
+- 프론트엔드와 API 연동
+
+#### 🚨 이슈/질문
+- 
+
+
+#### 📊 진행률
+Week 2: ██░░░░░░░░░░░ 17%
+
+---

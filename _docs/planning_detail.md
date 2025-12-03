@@ -642,12 +642,11 @@ npm install -D tailwindcss postcss autoprefixer
 npx tailwindcss init -p
 ```
 
-`tailwind.config.ts`
-```typescript
-import type { Config } from 'tailwindcss';
-
-const config: Config = {
-  content: ['./src/**/*.{js,jsx,ts,tsx}'],
+`tailwind.config.js`
+```javascript
+/** @type {import('tailwindcss').Config} */
+module.exports = {
+  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
       colors: {
@@ -664,8 +663,6 @@ const config: Config = {
   },
   plugins: [],
 };
-
-export default config;
 ```
 
 `src/index.css`

@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import 'dotenv/config';  // 추가
 import { DataSource } from 'typeorm';
 import { User } from './entity/Users';
 import { Project } from './entity/Projects';
@@ -12,6 +13,7 @@ export const AppDataSource = new DataSource({
     password: process.env.DB_PASSWORD,
     database: process.env.DB_DATABASE,
     entities: [User, Project, Paragraph],
+    migrations: ["./src/migrations/**/*.ts"],   // 마이그레이션 파일 위치
     // synchronize: true,     // 운영 전환 시 true → false
     synchronize: false,     // 스키마 자동 동기화 비활성화 (데이터 보호)
     logging: true,
