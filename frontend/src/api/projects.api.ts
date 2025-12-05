@@ -12,3 +12,15 @@ export const fetchProjectDetail = async (projectId: number) => {
     const response = await apiClient.get<Project>(`/projects/${projectId}`);
     return response.data;
 }
+
+// 컨텍스트 조회
+export const fetchProjectContexts = async (projectId: number) => {
+    const response = await apiClient.get<Project>(`/projects/${projectId}/context`);
+    return response.data;
+}
+
+// 컨텍스트 수정
+export const updateContext = async (projectId: number, data: Project) => {
+    const response = await apiClient.put(`/projects/${projectId}/context`, data);
+    return response.data;
+}

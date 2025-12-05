@@ -3,6 +3,7 @@ import type { Paragraph, ParagraphWrite } from "../types/database";
 import { useParams } from "react-router-dom";
 import { fetchProjectParagraphs } from "../api/parapraphs.api";
 import { writeParagraph } from "../api/writing.api";
+import { StoryContextPanel } from "./StoryContextPanel";
 
 function Editor() {
     const { projectId } = useParams(); // URL에서 projectId 가져오기
@@ -12,10 +13,11 @@ function Editor() {
 
     // 초기 데이터 로드
     useEffect(() => {
+        if (!projectId) return;
         fetchProjectParagraphs(Number(projectId)).then((paragraphs) => {
             setParagraphs(paragraphs);
         });
-    }, []);
+    }, [projectId]);
 
     // 단락 제출 핸들러
     const handleSubmit = async () => {
@@ -63,7 +65,7 @@ function Editor() {
                 </div>
             </section>
             {/* 우측 사이드바 (설정집) */}
-            {/* <StoryContextPanel projectId={Number(projectId)} /> */}
+            <StoryContextPanel projectId={Number(projectId)} />
         </div>
     )
 }

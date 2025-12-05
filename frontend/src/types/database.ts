@@ -21,3 +21,12 @@ export interface Paragraph {
 }
 
 export type ParagraphWrite = Pick<Paragraph, "id" | "content" | "writtenBy">;
+
+export interface LoreNote {
+    id: string;
+    category: string;
+    title: string;
+    content: string;
+    tags: string[];
+    includeInPrompt?: boolean;
+}

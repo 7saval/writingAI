@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Project } from "../types/database";
 import { fetchProjects } from "../api/projects.api";
+import { Link } from "react-router-dom";
 
 interface Props {
     onNewProject: () => void;
@@ -29,9 +30,9 @@ export function ProjectSidebar({ onNewProject, onProjectSelect, selectedProjectI
             <ul className="grid gap-4 sm:grid-cols-2">
                 {projects.map((p) => (
                     <li key={p.id} className="card p-4">
-                        <a href={`/projects/${p.id}`} className="text-lg font-medium text-slate-900">
+                        <Link to={`/projects/${p.id}/paragraphs`} className="text-lg font-medium text-slate-900">
                             {p.title}
-                        </a>
+                        </Link>
                         <span className="mt-1 inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
                             {p.genre}
                         </span>

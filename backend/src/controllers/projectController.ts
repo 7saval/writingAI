@@ -41,9 +41,15 @@ export async function getProjects(req: Request, res: Response, next: NextFunctio
 export async function getProjectDetail(req: Request, res: Response, next: NextFunction) {
     try {
         const repo = AppDataSource.getRepository(Project);
+        const projectId = Number(req.params.id);
+
+        if (isNaN(projectId)) {
+            return res.status(StatusCodes.BAD_REQUEST).json({ message: 'Invalid project ID' });
+        }
+
         const project = await repo.findOne({
             where: {
-                id: Number(req.params.id)
+                id: projectId
             },
             relations: ['paragraphs'],   // 연관된 단락들도 함께 조회
             order: {
@@ -100,9 +106,15 @@ export async function updateProject(req: Request, res: Response, next: NextFunct
 export async function getProjectParagraphs(req: Request, res: Response, next: NextFunction) {
     try {
         const repo = AppDataSource.getRepository(Paragraph);
+        const projectId = Number(req.params.id);
+
+        if (isNaN(projectId)) {
+            return res.status(StatusCodes.BAD_REQUEST).json({ message: 'Invalid project ID' });
+        }
+
         const paragraphs = await repo.find({
             where: {
-                project: { id: Number(req.params.id) }
+                project: { id: projectId }
             },
             order: {
                 orderIndex: 'ASC'

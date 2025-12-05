@@ -4,7 +4,7 @@ import { ProjectSidebar } from "../components/ProjectSidebar";
 function WritingSession() {
 
     return (
-        <div>
+        <div className="flex h-screen bg-background">
             {/* leftSidebar - 프로젝트바 */}
             <ProjectSidebar onNewProject={() => { }} onProjectSelect={() => { }} selectedProjectId={null} />
             {/* 메인 에디터 */}
