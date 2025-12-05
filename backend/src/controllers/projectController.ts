@@ -2,6 +2,7 @@ import { NextFunction, Request, Response } from "express";
 import { AppDataSource } from "../data-source";
 import { Project } from "../entity/Projects";
 import { StatusCodes } from "http-status-codes";
+import { Paragraph } from "../entity/Paragraphs";
 
 // 프로젝트 생성
 export async function createProject(req: Request, res: Response, next: NextFunction) {
@@ -90,6 +91,29 @@ export async function updateProject(req: Request, res: Response, next: NextFunct
 
         await repo.save(project);
         res.status(StatusCodes.OK).json(project);
+    } catch (error) {
+        next(error);
+    }
+}
+
+// 프로젝트 단락 조회
+export async function getProjectParagraphs(req: Request, res: Response, next: NextFunction) {
+    try {
+        const repo = AppDataSource.getRepository(Paragraph);
+        const paragraphs = await repo.find({
+            where: {
+                project: { id: Number(req.params.id) }
+            },
+            order: {
+                orderIndex: 'ASC'
+            }
+        });
+
+        if (!paragraphs) {
+            return res.status(StatusCodes.NOT_FOUND).json({ message: 'Paragraphs not found' });
+        }
+
+        res.status(StatusCodes.OK).json(paragraphs);
     } catch (error) {
         next(error);
     }

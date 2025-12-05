@@ -15,8 +15,18 @@ interface ContextOptions {
     loreFocusTags?: string[];
 }
 
+// AI 생성 옵션 인터페이스
+interface GenerationOptions {
+    temperature?: number;
+    maxTokens?: number;
+}
+
 // 다음 단락 생성
-export async function generateNextParagraph(project: Project, paragraphs: Paragraph[]) {
+export async function generateNextParagraph(
+    project: Project,
+    paragraphs: Paragraph[],
+    options?: GenerationOptions
+) {
     const prompt = buildContext(project, paragraphs, {
         includeSynopsis: true,
         includeLorebook: true,
@@ -30,8 +40,8 @@ export async function generateNextParagraph(project: Project, paragraphs: Paragr
             { role: 'system', content: '당신은 협업 소설 작가입니다.' },
             { role: 'user', content: prompt }
         ],
-        temperature: 0.8,   // 창의성
-        max_tokens: 500, // 출력 길이 제한
+        temperature: options?.temperature ?? 0.8,   // 창의성 (기본값: 0.8)
+        max_tokens: options?.maxTokens ?? 500, // 출력 길이 제한 (기본값: 500)
     });
 
     return response.choices[0].message.content;

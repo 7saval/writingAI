@@ -1,0 +1,23 @@
+export interface Project {
+    id: number;
+    user_id: number;
+    title: string;
+    description: string | null;
+    genre: string | null;
+    synopsis: string | null;
+    lorebook: any[] | null;
+    createdAt: Date;
+    updatedAt: Date;
+}
+
+export interface Paragraph {
+    id: number;
+    project_id: number;
+    content: string;
+    writtenBy: 'user' | 'ai';
+    orderIndex: number;
+    createdAt: Date;
+    updatedAt: Date;
+}
+
+export type ParagraphWrite = Pick<Paragraph, "id" | "content" | "writtenBy">;

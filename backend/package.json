@@ -24,6 +24,7 @@
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
+    "http-status-codes": "^2.3.0",
     "mysql2": "^3.15.3",
     "openai": "^6.9.1",
     "reflect-metadata": "^0.2.2",

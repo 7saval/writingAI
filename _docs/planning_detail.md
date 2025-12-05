@@ -629,6 +629,256 @@ router.use('/writing', writingRouter);
 
 ---
 
+### 2-4. 단락 관리 API (Paragraphs CRUD)
+
+**목표**: 단락 조회, 수정, 삭제, AI 재생성 기능을 제공합니다.
+
+#### 1) 라우터 생성
+`src/routes/paragraphRoutes.ts`
+```typescript
+import { Router } from 'express';
+import { 
+  getParagraphs, 
+  updateParagraph, 
+  deleteParagraph, 
+  regenerateAiParagraph 
+} from '../controllers/paragraphController';
+
+export const paragraphRouter = Router();
+
+// 프로젝트의 모든 단락 조회
+paragraphRouter.get('/:projectId/paragraphs', getParagraphs);
+
+// 단락 수정
+paragraphRouter.put('/paragraphs/:id', updateParagraph);
+
+// 단락 삭제
+paragraphRouter.delete('/paragraphs/:id', deleteParagraph);
+
+// AI 단락 재생성
+paragraphRouter.post('/paragraphs/:id/regenerate', regenerateAiParagraph);
+```
+
+`src/routes/index.ts`에 추가:
+```typescript
+import { paragraphRouter } from './paragraphRoutes';
+
+router.use('/projects', projectRouter);
+router.use('/projects', contextRouter);
+router.use('/projects', paragraphRouter); // 단락 라우터 추가
+router.use('/writing', writingRouter);
+```
+
+#### 2) 컨트롤러 구현
+`src/controllers/paragraphController.ts`
+```typescript
+import { Request, Response, NextFunction } from 'express';
+import { AppDataSource } from '../data-source';
+import { Paragraph } from '../entity/Paragraph';
+import { Project } from '../entity/Project';
+import { generateNextParagraph } from '../services/aiService';
+
+// 프로젝트의 모든 단락 조회
+export async function getParagraphs(req: Request, res: Response, next: NextFunction) {
+  try {
+    const repo = AppDataSource.getRepository(Paragraph);
+    
+    // 쿼리 파라미터로 페이지네이션 지원
+    const limit = Number(req.query.limit) || 50;
+    const offset = Number(req.query.offset) || 0;
+    
+    const [paragraphs, total] = await repo.findAndCount({
+      where: { project: { id: Number(req.params.projectId) } },
+      order: { orderIndex: 'ASC' }, // 순서대로 정렬
+      take: limit,
+      skip: offset,
+    });
+
+    res.json({
+      total,
+      paragraphs,
+      limit,
+      offset,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+// 단락 수정
+export async function updateParagraph(req: Request, res: Response, next: NextFunction) {
+  try {
+    const repo = AppDataSource.getRepository(Paragraph);
+    const paragraph = await repo.findOneBy({ id: Number(req.params.id) });
+
+    if (!paragraph) {
+      return res.status(404).json({ message: 'Paragraph not found' });
+    }
+
+    // 내용만 수정 가능 (writtenBy, orderIndex는 수정 불가)
+    if (req.body.content !== undefined) {
+      paragraph.content = req.body.content;
+    }
+
+    await repo.save(paragraph);
+    res.json(paragraph);
+  } catch (error) {
+    next(error);
+  }
+}
+
+// 단락 삭제
+export async function deleteParagraph(req: Request, res: Response, next: NextFunction) {
+  try {
+    const repo = AppDataSource.getRepository(Paragraph);
+    const paragraph = await repo.findOneBy({ id: Number(req.params.id) });
+
+    if (!paragraph) {
+      return res.status(404).json({ message: 'Paragraph not found' });
+    }
+
+    await repo.remove(paragraph);
+    res.json({ 
+      message: 'Paragraph deleted successfully',
+      deletedId: Number(req.params.id)
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+// AI 단락 재생성
+export async function regenerateAiParagraph(req: Request, res: Response, next: NextFunction) {
+  try {
+    const paragraphRepo = AppDataSource.getRepository(Paragraph);
+    const projectRepo = AppDataSource.getRepository(Project);
+
+    // 재생성할 단락 조회
+    const paragraph = await paragraphRepo.findOne({
+      where: { id: Number(req.params.id) },
+      relations: ['project'],
+    });
+
+    if (!paragraph) {
+      return res.status(404).json({ message: 'Paragraph not found' });
+    }
+
+    // AI가 작성한 단락만 재생성 가능
+    if (paragraph.writtenBy !== 'ai') {
+      return res.status(400).json({ message: 'Only AI paragraphs can be regenerated' });
+    }
+
+    // 프로젝트와 이전 단락들 조회
+    const project = await projectRepo.findOne({
+      where: { id: paragraph.project.id },
+      relations: ['paragraphs'],
+    });
+
+    if (!project) {
+      return res.status(404).json({ message: 'Project not found' });
+    }
+
+    // 재생성할 단락 이전의 단락들만 컨텍스트로 사용
+    const previousParagraphs = project.paragraphs
+      .filter(p => p.orderIndex < paragraph.orderIndex)
+      .sort((a, b) => a.orderIndex - b.orderIndex);
+
+    // AI 텍스트 재생성 (옵션 파라미터 지원)
+    const temperature = req.body.temperature || 0.8;
+    const maxTokens = req.body.maxTokens || 500;
+
+    const aiText = await generateNextParagraph(
+      project, 
+      previousParagraphs,
+      { temperature, maxTokens } // 추가 옵션 전달
+    );
+
+    // 단락 내용 업데이트
+    paragraph.content = aiText.trim();
+    await paragraphRepo.save(paragraph);
+
+    res.json(paragraph);
+  } catch (error) {
+    next(error);
+  }
+}
+```
+
+#### 3) AI 서비스 함수 확장 (선택사항)
+`src/services/aiService.ts`에서 `generateNextParagraph` 함수에 옵션 파라미터 추가:
+
+```typescript
+interface GenerationOptions {
+  temperature?: number;
+  maxTokens?: number;
+}
+
+export async function generateNextParagraph(
+  project: Project, 
+  paragraphs: Paragraph[],
+  options: GenerationOptions = {}
+) {
+  const prompt = buildContext(project, paragraphs, {
+    includeSynopsis: true,
+    includeLorebook: true,
+    includeDescription: true,
+    maxParagraphs: 8,
+  });
+
+  const response = await client.chat.completions.create({
+    model: 'gpt-4o-mini',
+    messages: [
+      { role: 'system', content: '당신은 협업 소설 작가입니다.' },
+      { role: 'user', content: prompt },
+    ],
+    temperature: options.temperature ?? 0.8, // 옵션으로 조절 가능
+    max_tokens: options.maxTokens ?? 500,
+  });
+
+  return response.choices[0].message.content || '';
+}
+```
+
+#### 4) 사용 예시
+
+**단락 목록 조회**:
+```bash
+GET /api/projects/1/paragraphs?limit=20&offset=0
+```
+
+**단락 수정**:
+```bash
+PUT /api/paragraphs/5
+Content-Type: application/json
+
+{
+  "content": "수정된 단락 내용입니다."
+}
+```
+
+**단락 삭제**:
+```bash
+DELETE /api/paragraphs/5
+```
+
+**AI 단락 재생성**:
+```bash
+POST /api/paragraphs/6/regenerate
+Content-Type: application/json
+
+{
+  "temperature": 0.9,
+  "maxTokens": 600
+}
+```
+
+**구현 파일 요약**:
+- 라우터: `backend/src/routes/paragraphRoutes.ts`
+- 컨트롤러: `backend/src/controllers/paragraphController.ts`
+- 서비스: `backend/src/services/aiService.ts` (확장)
+
+---
+
 ## 3. Week 3 - Frontend 구현
 
 ### 3-1. Vite 프로젝트 초기화
@@ -942,6 +1192,312 @@ export function StoryContextPanel({ projectId }: { projectId: number }) {
 - 사용자 문단: `bg-userBg`, AI 문단: `bg-aiBg`
 - 패널 헤더: `flex items-center justify-between text-sm text-slate-500`
 - 체크박스: `h-4 w-4 rounded border-border text-primary focus:ring-primary`
+
+---
+
+### 3-6. 단락 관리 UI (수정/삭제/재생성)
+
+**목표**: 각 단락에 수정, 삭제, AI 재생성 버튼을 추가합니다.
+
+#### 1) 단락 아이템 컴포넌트 확장
+`src/components/ParagraphItem.tsx`
+```typescript
+import { useState } from 'react';
+import { apiClient } from '../api/client';
+
+interface ParagraphItemProps {
+  paragraph: {
+    id: number;
+    content: string;
+    writtenBy: 'user' | 'ai';
+    orderIndex: number;
+  };
+  onUpdate: (id: number, newContent: string) => void;
+  onDelete: (id: number) => void;
+  onRegenerate: (id: number, newContent: string) => void;
+}
+
+export function ParagraphItem({ paragraph, onUpdate, onDelete, onRegenerate }: ParagraphItemProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editContent, setEditContent] = useState(paragraph.content);
+  const [isRegenerating, setIsRegenerating] = useState(false);
+
+  // 수정 저장
+  const handleSave = async () => {
+    try {
+      await apiClient.put(`/paragraphs/${paragraph.id}`, { content: editContent });
+      onUpdate(paragraph.id, editContent);
+      setIsEditing(false);
+    } catch (error) {
+      console.error('Failed to update paragraph:', error);
+      alert('단락 수정에 실패했습니다.');
+    }
+  };
+
+  // 삭제
+  const handleDelete = async () => {
+    if (!confirm('정말 이 단락을 삭제하시겠습니까?')) return;
+    
+    try {
+      await apiClient.delete(`/paragraphs/${paragraph.id}`);
+      onDelete(paragraph.id);
+    } catch (error) {
+      console.error('Failed to delete paragraph:', error);
+      alert('단락 삭제에 실패했습니다.');
+    }
+  };
+
+  // AI 재생성
+  const handleRegenerate = async () => {
+    if (!confirm('AI 단락을 다시 생성하시겠습니까?')) return;
+    
+    setIsRegenerating(true);
+    try {
+      const res = await apiClient.post(`/paragraphs/${paragraph.id}/regenerate`, {
+        temperature: 0.8,
+        maxTokens: 500,
+      });
+      onRegenerate(paragraph.id, res.data.content);
+    } catch (error) {
+      console.error('Failed to regenerate paragraph:', error);
+      alert('AI 재생성에 실패했습니다.');
+    } finally {
+      setIsRegenerating(false);
+    }
+  };
+
+  return (
+    <article
+      className={`group relative rounded-xl border border-border px-4 py-3 ${
+        paragraph.writtenBy === 'user' ? 'bg-userBg' : 'bg-aiBg'
+      }`}
+    >
+      {/* 작성자 표시 */}
+      <div className="mb-2 flex items-center justify-between">
+        <strong className="text-sm text-slate-500">
+          {paragraph.writtenBy === 'user' ? '나' : 'AI'}
+        </strong>
+        
+        {/* 액션 버튼들 (호버 시 표시) */}
+        <div className="flex gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+          {/* 수정 버튼 */}
+          {!isEditing && (
+            <button
+              onClick={() => setIsEditing(true)}
+              className="text-xs text-slate-500 hover:text-primary"
+            >
+              수정
+            </button>
+          )}
+          
+          {/* AI 재생성 버튼 (AI 단락만) */}
+          {paragraph.writtenBy === 'ai' && !isEditing && (
+            <button
+              onClick={handleRegenerate}
+              disabled={isRegenerating}
+              className="text-xs text-slate-500 hover:text-secondary disabled:opacity-50"
+            >
+              {isRegenerating ? '재생성 중...' : '🔄 재생성'}
+            </button>
+          )}
+          
+          {/* 삭제 버튼 */}
+          <button
+            onClick={handleDelete}
+            className="text-xs text-slate-500 hover:text-red-500"
+          >
+            삭제
+          </button>
+        </div>
+      </div>
+
+      {/* 내용 표시/수정 */}
+      {isEditing ? (
+        <div className="space-y-2">
+          <textarea
+            value={editContent}
+            onChange={(e) => setEditContent(e.target.value)}
+            className="w-full rounded-lg border border-border bg-white p-2 text-sm focus:border-primary focus:outline-none"
+            rows={4}
+          />
+          <div className="flex gap-2">
+            <button
+              onClick={handleSave}
+              className="rounded-lg bg-primary px-3 py-1 text-xs text-white hover:bg-indigo-500"
+            >
+              저장
+            </button>
+            <button
+              onClick={() => {
+                setIsEditing(false);
+                setEditContent(paragraph.content);
+              }}
+              className="rounded-lg bg-slate-200 px-3 py-1 text-xs text-slate-700 hover:bg-slate-300"
+            >
+              취소
+            </button>
+          </div>
+        </div>
+      ) : (
+        <p className="whitespace-pre-line text-slate-900">{paragraph.content}</p>
+      )}
+    </article>
+  );
+}
+```
+
+#### 2) WritingSession 컴포넌트 업데이트
+`src/pages/WritingSession.tsx` 수정:
+```typescript
+import { useEffect, useState } from 'react';
+import { useParams } from 'react-router-dom';
+import { apiClient } from '../api/client';
+import { StoryContextPanel } from '../components/StoryContextPanel';
+import { ParagraphItem } from '../components/ParagraphItem';
+
+interface Paragraph {
+  id: number;
+  writtenBy: 'user' | 'ai';
+  content: string;
+  orderIndex: number;
+}
+
+export function WritingSession() {
+  const { projectId } = useParams();
+  const [paragraphs, setParagraphs] = useState<Paragraph[]>([]);
+  const [input, setInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  // 초기 데이터 로드
+  useEffect(() => {
+    apiClient.get(`/projects/${projectId}`).then((res) => setParagraphs(res.data.paragraphs));
+  }, [projectId]);
+
+  // 단락 제출 핸들러
+  const handleSubmit = async () => {
+    if (!input.trim()) return;
+    setIsLoading(true);
+    try {
+      const res = await apiClient.post(`/writing/${projectId}/write`, { content: input });
+      setParagraphs((prev) => [...prev, res.data.userParagraph, res.data.aiParagraph]);
+      setInput('');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 단락 수정 핸들러
+  const handleUpdate = (id: number, newContent: string) => {
+    setParagraphs((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, content: newContent } : p))
+    );
+  };
+
+  // 단락 삭제 핸들러
+  const handleDelete = (id: number) => {
+    setParagraphs((prev) => prev.filter((p) => p.id !== id));
+  };
+
+  // AI 재생성 핸들러
+  const handleRegenerate = (id: number, newContent: string) => {
+    setParagraphs((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, content: newContent } : p))
+    );
+  };
+
+  return (
+    <div className="mx-auto grid max-w-6xl gap-6 px-6 py-10 lg:grid-cols-[65%_35%]">
+      {/* 메인 글쓰기 영역 */}
+      <section className="flex flex-col rounded-2xl border border-border bg-white shadow-sm">
+        <div className="flex-1 space-y-4 overflow-y-auto p-6">
+          {paragraphs.map((p) => (
+            <ParagraphItem
+              key={p.id}
+              paragraph={p}
+              onUpdate={handleUpdate}
+              onDelete={handleDelete}
+              onRegenerate={handleRegenerate}
+            />
+          ))}
+        </div>
+        {/* 입력 영역 */}
+        <div className="border-t border-border p-6">
+          <textarea
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="이야기를 이어 써보세요"
+            className="h-32 w-full rounded-xl border border-border bg-slate-50 p-4 text-base focus:border-primary focus:outline-none"
+          />
+          <button className="btn-primary mt-4 w-full" disabled={isLoading} onClick={handleSubmit}>
+            {isLoading ? 'AI 작성 중...' : '단락 제출'}
+          </button>
+        </div>
+      </section>
+      {/* 우측 사이드바 (설정집) */}
+      <StoryContextPanel projectId={Number(projectId)} />
+    </div>
+  );
+}
+```
+
+#### 3) API 클라이언트 함수 (선택사항)
+`src/api/paragraphs.api.ts` (타입 안전성을 위한 별도 파일):
+```typescript
+import { apiClient } from './client';
+
+export interface Paragraph {
+  id: number;
+  content: string;
+  writtenBy: 'user' | 'ai';
+  orderIndex: number;
+  createdAt: string;
+}
+
+export const paragraphsApi = {
+  // 단락 목록 조회
+  getAll: async (projectId: number, limit = 50, offset = 0) => {
+    const res = await apiClient.get(`/projects/${projectId}/paragraphs`, {
+      params: { limit, offset },
+    });
+    return res.data;
+  },
+
+  // 단락 수정
+  update: async (id: number, content: string) => {
+    const res = await apiClient.put(`/paragraphs/${id}`, { content });
+    return res.data;
+  },
+
+  // 단락 삭제
+  delete: async (id: number) => {
+    const res = await apiClient.delete(`/paragraphs/${id}`);
+    return res.data;
+  },
+
+  // AI 재생성
+  regenerate: async (id: number, options?: { temperature?: number; maxTokens?: number }) => {
+    const res = await apiClient.post(`/paragraphs/${id}/regenerate`, options);
+    return res.data;
+  },
+};
+```
+
+#### 4) 스타일링 팁
+- **호버 효과**: `group` 클래스와 `group-hover:opacity-100`으로 버튼 표시
+- **로딩 상태**: `disabled:opacity-50`으로 비활성화 표시
+- **아이콘**: 이모지 🔄 또는 React Icons 라이브러리 사용
+- **확인 다이얼로그**: `confirm()` 또는 커스텀 모달 컴포넌트 사용
+
+#### 5) 개선 아이디어
+- **Optimistic UI**: API 호출 전에 UI를 먼저 업데이트하고, 실패 시 롤백
+- **토스트 알림**: 성공/실패 메시지를 우아하게 표시
+- **키보드 단축키**: `Ctrl+E`로 수정, `Ctrl+R`로 재생성 등
+- **실행 취소**: 삭제한 단락을 복구할 수 있는 기능
+
+**구현 파일 요약**:
+- 컴포넌트: `frontend/src/components/ParagraphItem.tsx` (새 파일)
+- 페이지: `frontend/src/pages/WritingSession.tsx` (수정)
+- API: `frontend/src/api/paragraphs.api.ts` (새 파일, 선택사항)
 
 ---
 
