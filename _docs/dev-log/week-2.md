@@ -497,3 +497,123 @@ const debouncedSave = (payload: any) => {
 Week 2: ███░░░░░░░░░░░ 20%
 
 ---
+### 📅 2025-12-06 (Day 10)
+
+#### 🎯 오늘의 목표
+- [ ] 레이아웃 조정
+- [ ] 단락 관리 UI (수정/삭제/재생성)
+
+#### ✅ 완료한 작업
+- ✅ 라우터 정리
+- ✅ 레이아웃 화면 크기에 맞게 조정
+- ✅ 프로젝트 생성 모달창 구현
+  
+  
+#### 작업 내용 상세
+- 리액트 라우터 - RouterProvider와 CreateBrowserRouter 이용  
+
+[기존내용]
+```typescript
+// main.tsx
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <BrowserRouter>
+      <App />
+    </BrowserRouter>
+  </StrictMode>,
+)
+
+// App.tsx
+function App() {
+
+  return (
+    <Routes>
+      <Route path="/" element={<Navigate to="/projects/new" replace />} />
+      <Route path="/projects/:projectId/paragraphs" element={<WritingSession />} />
+      {/* Route for creating/viewing empty state? For now, redirect to a generic page or handle in WritingSession */}
+      <Route path="/projects" element={<WritingSession />} />
+    </Routes>
+  )
+}
+```
+
+[수정내용]
+- BrowserRouter를 제거하고 RouterProvider와 createBrowserRouter를 사용
+
+```typescript
+// main.tsx
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <App />
+  </StrictMode>,
+)
+
+// App.tsx
+function App() {
+
+  return (
+    <>
+      <RouterProvider router={router} />
+    </>
+  )
+}
+
+// routeList.tsx
+export const routeList = [
+    {
+        path: "/",
+        element: <Home />
+    },
+    {
+        path: "/projects",
+        element: <WritingSession />
+    },
+]
+```
+  
+#### 💡 정리할 것
+- useParams()
+  - useParams()는 React Router 라이브러리에서 제공하는 Hook
+  - 목적: URL의 동적인 부분(:변수명)을 컴포넌트에서 읽어오기 위해 사용.
+  - 반환값: 현재 URL 파라미터들의 키-값 객체 (String 타입).
+
+- <aside> 태그
+  - <aside> 태그는 HTML5에서 도입된 태그로, 문서의 주요 내용 외에 추가적인 정보를 제공할 때 사용. 쉽게 말해, 문서의 사이드바나 부가적인 내용을 나타낼 때 사용.
+
+
+**새로 알게 된 개념**  
+---
+1) RouterProvider란?
+- React Router v6.4에서 도입된 라우팅 방식으로 BrowserRouter를 대체하는 컴포넌트
+- createBrowserRouter를 사용하여 라우트를 설정하고 RouterProvider를 통해 라우트를 전달
+
+2) Tailwind CSS 관련 참고 링크
+- [Tailwind CSS](https://tailwindcss.com/docs)
+- [Tailwind CSS 치트시트](tailwindcomponents.com/cheatsheet) : 공식문서 한 페이지에서 보기
+- VS Code의 확장(Extensions) : **Tailwind CSS IntelliSense** 설치 - 자동완성 기능
+
+---
+#### 🔧 해결한 문제
+**문제1**: 
+
+**원인**: 
+
+**해결**: 
+
+
+
+**참고 링크**:
+
+#### 📌 내일 할 일
+- [ ] 프로젝트 수정/삭제 구현
+- [ ] 단락 관리 UI (수정/삭제/재생성)
+- [ ] 시놉시스&설정집 삭제 구현
+
+#### 🚨 이슈/질문
+- 
+
+
+#### 📊 진행률
+Week 2: █████░░░░░░░░░ 30%
+
+---

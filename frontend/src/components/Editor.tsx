@@ -21,7 +21,7 @@ function Editor() {
 
     // 단락 제출 핸들러
     const handleSubmit = async () => {
-        if (!input.trim()) return;
+        if (!input.trim() || !projectId) return;
         setIsLoading(true);
         try {
             // 유저 입력 전송 및 AI 응답 수신
@@ -33,10 +33,20 @@ function Editor() {
         }
     };
 
+    if (!projectId) {
+        return (
+            <div className="flex h-full w-full items-center justify-center text-slate-400">
+                <p>왼쪽 사이드바에서 프로젝트를 선택해주세요.</p>
+            </div>
+        );
+    }
+
+
     return (
-        <div className="mx-auto grid max-w-6xl gap-6 px-6 py-10 lg:grid-cols-[65%_35%]">
+        // flex-1 to take up remaining space, h-full to fill parent
+        <div className="flex h-full w-full flex-col">
             {/* 메인 글쓰기 영역 */}
-            <section className="flex flex-col rounded-2xl border border-border bg-white shadow-sm">
+            <section className="flex flex-col overflow-hidden bg-white">
                 <div className="flex-1 space-y-4 overflow-y-auto p-6">
                     {paragraphs.map((p) => (
                         <article
@@ -64,8 +74,6 @@ function Editor() {
                     </button>
                 </div>
             </section>
-            {/* 우측 사이드바 (설정집) */}
-            <StoryContextPanel projectId={Number(projectId)} />
         </div>
     )
 }

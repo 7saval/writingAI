@@ -1,17 +1,16 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { RouterProvider, createBrowserRouter } from 'react-router-dom';
 import './App.css'
-import WritingSession from './pages/WritingSession'
+import { routeList } from './utils/routeList';
+
+const router = createBrowserRouter(routeList);
 
 function App() {
 
   return (
-    <Routes>
-      <Route path="/" element={<Navigate to="/projects/new" replace />} />
-      <Route path="/projects/:projectId/paragraphs" element={<WritingSession />} />
-      {/* Route for creating/viewing empty state? For now, redirect to a generic page or handle in WritingSession */}
-      <Route path="/projects" element={<WritingSession />} />
-    </Routes>
+    <>
+      <RouterProvider router={router} />
+    </>
   )
 }
 
-export default App
+export default App;
