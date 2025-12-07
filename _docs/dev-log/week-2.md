@@ -377,6 +377,7 @@ npm run migration:revert
 
 ```bash
 npm run migration:generate -- ./src/migrations/마이그레이션이름
+npm run migration:generate -- ./src/migrations/intialMigration
 ```
 
 동작:
@@ -608,6 +609,89 @@ export const routeList = [
 - [ ] 프로젝트 수정/삭제 구현
 - [ ] 단락 관리 UI (수정/삭제/재생성)
 - [ ] 시놉시스&설정집 삭제 구현
+
+#### 🚨 이슈/질문
+- 
+
+
+#### 📊 진행률
+Week 2: █████░░░░░░░░░ 30%
+
+---
+### 📅 2025-12-07 (Day 11)
+
+#### 🎯 오늘의 목표
+- [ ] 프로젝트 수정/삭제 구현
+- [ ] 단락 관리 UI (수정/삭제/재생성)
+- [ ] 시놉시스&설정집 삭제 구현
+- [ ] 홈 화면, 헤더 푸터 레이아웃 구현
+
+#### ✅ 완료한 작업
+- ✅ 
+  
+  
+#### 작업 내용 상세
+- 프로젝트 수정/삭제 구현
+  - 인라인 SVG를 사용하여 수정, 삭제 이미지 구현
+
+1) SVG 기본 구조(삭제 이미지 예시)
+```typescript
+<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+```
+- xmlns: SVG의 네임스페이스를 정의합니다 (항상 이 값으로 고정)
+- width="14" height="14": 실제 화면에 표시될 크기 (14px × 14px)
+- viewBox="0 0 24 24": SVG의 좌표계를 정의합니다
+  - 0 0은 시작점 (x, y) 
+  - 24 24는 끝점 (width, height)
+  즉, 24×24 크기의 캔버스에 그림을 그리지만, 실제로는 14×14로 축소되어 표시됩니다
+- fill="none": 도형 내부를 채우지 않습니다 (선만 그립니다)
+- stroke="currentColor": 선의 색상을 현재 텍스트 색상과 동일하게 설정 (CSS로 제어 가능)
+- strokeWidth="2": 선의 두께는 2px
+- strokeLinecap="round": 선의 끝을 둥글게 처리
+- strokeLinejoin="round": 선이 만나는 지점을 둥글게 처리  
+  
+2) X모양 그리기
+```typescript
+<path d="M18 6 6 18" />
+<path d="m6 6 12 12" />
+```
+- 첫 번째 선 (왼쪽 위 → 오른쪽 아래):
+  - M18 6: Move to (이동) - 좌표 (18, 6)으로 펜을 이동
+  - 6 18: Line to (선 그리기) - 좌표 (6, 18)까지 선을 그립니다
+  - 결과: 우상단에서 좌하단으로 대각선 \ 
+
+- 두 번째 선 (왼쪽 아래 → 오른쪽 위):
+  - m6 6: move to (상대 이동) - 현재 위치에서 상대적으로 (6, 6) 이동
+  - 12 12: 상대적으로 (12, 12) 위치까지 선을 그립니다
+  - 결과: 좌상단에서 우하단으로 대각선 /  
+  
+
+#### 💡 정리할 것
+- stopPropagation()
+- useNavigate()
+- useCallback()
+
+
+**새로 알게 된 개념**  
+1) 
+
+---
+#### 🔧 해결한 문제
+**문제1**: 새 프로젝트 생성 후 isActive 상태가 생성한 프로젝트로 변경되지 않음
+
+**원인**: isActive 상태는 url에서 projectId를 통해 결정됨. 프로젝트 생성 시 url을 변경해주지 않고 프로젝트 재조회만 함.
+
+**해결**: handleProjectCreated 함수에서 navigate로 새 프로젝트id로 이동하도록 했다. NewProjectModal에서 새로 생성된 프로젝트의 ID를 콜백으로 전달하고 있었기 때문에, 그 ID를 사용해서 해당 프로젝트로 라우팅하도록 했다.
+
+
+
+**참고 링크**:
+
+#### 📌 내일 할 일
+- [ ] 프로젝트 수정/삭제 구현
+- [ ] 단락 관리 UI (수정/삭제/재생성)
+- [ ] 시놉시스&설정집 삭제 구현
+- [ ] 홈 화면, 헤더 푸터 레이아웃 구현
 
 #### 🚨 이슈/질문
 - 

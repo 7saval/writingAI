@@ -34,6 +34,6 @@ export class Project {
     @JoinColumn({ name: 'user_id', referencedColumnName: 'id' })  // 조인컬럼 설정(생략 가능)
     user!: User;
 
-    @OneToMany(() => Paragraph, (paragraph) => paragraph.project)   // OneToMany 연결(생략 가능)
+    @OneToMany(() => Paragraph, (paragraph) => paragraph.project, { cascade: true })   // OneToMany 연결
     paragraphs!: Paragraph[];
 }

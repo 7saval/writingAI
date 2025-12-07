@@ -15,7 +15,19 @@ export const fetchProjectDetail = async (projectId: number) => {
 
 // 프로젝트 생성
 export const createProject = async (data: Project) => {
-    const response = await apiClient.post<Project>(`/projects`, data);
+    const response = await apiClient.post(`/projects`, data);
+    return response.data;
+}
+
+// 프로젝트 수정
+export const updateProject = async (projectId: number, data: Project) => {
+    const response = await apiClient.put(`/projects/${projectId}`, data);
+    return response.data;
+}
+
+// 프로젝트 삭제
+export const deleteProject = async (projectId: number) => {
+    const response = await apiClient.delete(`/projects/${projectId}`);
     return response.data;
 }
 

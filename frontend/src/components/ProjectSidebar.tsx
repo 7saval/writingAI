@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import type { Project } from "../types/database";
-import { fetchProjects } from "../api/projects.api";
-import { Link } from "react-router-dom";
+import { deleteProject, fetchProjects } from "../api/projects.api";
+import { Link, useNavigate } from "react-router-dom";
 import { NewProjectModal } from "./NewProjectModal";
 
 interface Props {
@@ -15,6 +15,7 @@ interface Props {
 export function ProjectSidebar({ projectId }: Props) {
     const [projects, setProjects] = useState<Project[]>([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const navigate = useNavigate();
 
     const loadProjects = useCallback(() => {
         fetchProjects().then(setProjects).catch(console.error);
@@ -25,10 +26,40 @@ export function ProjectSidebar({ projectId }: Props) {
         loadProjects();
     }, [loadProjects]);
 
-    const handleProjectCreated = (newProjectId: string) => {
+    // 프로젝트 생성
+    const handleCreateProject = (newProjectId: string) => {
         loadProjects();
-        // 필요한 경우 라우팅 처리 등 추가 가능
+        // 새로 생성된 프로젝트로 이동하여 isActive 상태로 만들기
+        navigate(`/projects/${newProjectId}/paragraphs`);
     };
+
+    // 프로젝트 수정
+    const handleUpdateProject = (e: React.MouseEvent, id: number) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        alert("프로젝트 수정");
+    }
+
+    // 프로젝트 삭제
+    const handleDeleteProject = (e: React.MouseEvent, id: number) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        if (!window.confirm("정말로 이 프로젝트를 삭제하시겠습니까? 삭제된 데이터는 복구할 수 없습니다.")) return;
+
+        deleteProject(id).then(() => {
+            loadProjects();
+            // 만약 삭제한 프로젝트가 현재 활성화된 프로젝트라면 메인으로 이동
+            if (String(id) === projectId) {
+                // 프로젝트 화면 이동
+                navigate("/projects");
+            }
+        }).catch(err => {
+            console.error("Failed to delete project:", err);
+            alert("프로젝트 삭제에 실패했습니다.");
+        });
+    }
 
     return (
         <>
@@ -48,10 +79,10 @@ export function ProjectSidebar({ projectId }: Props) {
                         {projects.map((p) => {
                             const isActive = String(p.id) === projectId;
                             return (
-                                <li key={p.id}>
+                                <li key={p.id} className="group relative">
                                     <Link
                                         to={`/projects/${p.id}/paragraphs`}
-                                        className={`block rounded-md px-3 py-2 text-sm font-medium transition-colors ${isActive
+                                        className={`block rounded-md py-2 pl-3 pr-16 text-sm font-medium transition-colors ${isActive
                                             ? 'bg-white text-primary shadow-sm ring-1 ring-slate-200'
                                             : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                                             }`}
@@ -59,6 +90,28 @@ export function ProjectSidebar({ projectId }: Props) {
                                         <div className="truncate">{p.title}</div>
                                         <div className="mt-0.5 truncate text-xs text-slate-400">{p.genre}</div>
                                     </Link>
+                                    {/* 수정 버튼 */}
+                                    <button
+                                        onClick={(e) => handleUpdateProject(e, Number(p.id))}
+                                        className="absolute right-8 top-1/2 -translate-y-1/2 rounded p-1 text-slate-400 opacity-0 hover:bg-slate-200 hover:text-blue-500 group-hover:opacity-100"
+                                        title="프로젝트 수정"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                                            <path d="m15 5 4 4" />
+                                        </svg>
+                                    </button>
+                                    {/* 삭제 버튼 */}
+                                    <button
+                                        onClick={(e) => handleDeleteProject(e, Number(p.id))}
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-slate-400 opacity-0 hover:bg-slate-200 hover:text-red-500 group-hover:opacity-100"
+                                        title="프로젝트 삭제"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M18 6 6 18" />
+                                            <path d="m6 6 12 12" />
+                                        </svg>
+                                    </button>
                                 </li>
                             );
                         })}
@@ -70,7 +123,7 @@ export function ProjectSidebar({ projectId }: Props) {
                     <NewProjectModal
                         open={isModalOpen}
                         onOpenChange={setIsModalOpen}
-                        onProjectCreated={handleProjectCreated}
+                        onProjectCreated={handleCreateProject}
                     />
                 )
             }

@@ -102,6 +102,29 @@ export async function updateProject(req: Request, res: Response, next: NextFunct
     }
 }
 
+// 프로젝트 삭제
+export async function deleteProject(req: Request, res: Response, next: NextFunction) {
+    try {
+        const repo = AppDataSource.getRepository(Project);
+        const projectId = Number(req.params.id);
+
+        if (isNaN(projectId)) {
+            return res.status(StatusCodes.BAD_REQUEST).json({ message: 'Invalid project ID' });
+        }
+
+        const project = await repo.findOneBy({ id: projectId });
+
+        if (!project) {
+            return res.status(StatusCodes.NOT_FOUND).json({ message: 'Project not found' });
+        }
+
+        await repo.remove(project);
+        res.status(StatusCodes.OK).json({ message: 'Project deleted successfully' });
+    } catch (error) {
+        next(error);
+    }
+}
+
 // 프로젝트 단락 조회
 export async function getProjectParagraphs(req: Request, res: Response, next: NextFunction) {
     try {

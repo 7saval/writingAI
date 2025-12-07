@@ -8,6 +8,13 @@ export function StoryContextPanel({ projectId }: { projectId: number }) {
     const [timer, setTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
+        // projectId가 유효하지 않으면 API 호출x, 상태 초기화
+        if (!projectId || isNaN(projectId)) {
+            setSynopsis('');
+            setLorebook([]);
+            return;
+        }
+
         fetchProjectContexts(projectId).then((contexts) => {
             setSynopsis(contexts.synopsis || '');
             setLorebook(contexts.lorebook || []);
