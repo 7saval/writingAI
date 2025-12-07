@@ -2,7 +2,8 @@ import { useEffect, useState, useCallback } from "react";
 import type { Project } from "../types/database";
 import { deleteProject, fetchProjects } from "../api/projects.api";
 import { Link, useNavigate } from "react-router-dom";
-import { NewProjectModal } from "./NewProjectModal";
+import { NewProjectModal } from "../pages/NewProjectModal";
+import { EditProjectModal } from "../pages/EditProjectModal";
 
 interface Props {
     // onNewProject는 이제 내부에서 처리하므로 선택적 prop으로 변경하거나 제거할 수 있지만, 
@@ -15,6 +16,7 @@ interface Props {
 export function ProjectSidebar({ projectId }: Props) {
     const [projects, setProjects] = useState<Project[]>([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [editingProject, setEditingProject] = useState<Project | null>(null);
     const navigate = useNavigate();
 
     const loadProjects = useCallback(() => {
@@ -34,11 +36,11 @@ export function ProjectSidebar({ projectId }: Props) {
     };
 
     // 프로젝트 수정
-    const handleUpdateProject = (e: React.MouseEvent, id: number) => {
+    const handleUpdateProject = (e: React.MouseEvent, project: Project) => {
         e.preventDefault();
         e.stopPropagation();
 
-        alert("프로젝트 수정");
+        setEditingProject(project);
     }
 
     // 프로젝트 삭제
@@ -92,7 +94,7 @@ export function ProjectSidebar({ projectId }: Props) {
                                     </Link>
                                     {/* 수정 버튼 */}
                                     <button
-                                        onClick={(e) => handleUpdateProject(e, Number(p.id))}
+                                        onClick={(e) => handleUpdateProject(e, p)}
                                         className="absolute right-8 top-1/2 -translate-y-1/2 rounded p-1 text-slate-400 opacity-0 hover:bg-slate-200 hover:text-blue-500 group-hover:opacity-100"
                                         title="프로젝트 수정"
                                     >
@@ -124,6 +126,19 @@ export function ProjectSidebar({ projectId }: Props) {
                         open={isModalOpen}
                         onOpenChange={setIsModalOpen}
                         onProjectCreated={handleCreateProject}
+                    />
+                )
+            }
+            {
+                editingProject && (
+                    <EditProjectModal
+                        open={!!editingProject}
+                        project={editingProject}
+                        onOpenChange={(open) => !open && setEditingProject(null)}
+                        onProjectUpdated={() => {
+                            loadProjects();
+                            setEditingProject(null);
+                        }}
                     />
                 )
             }
