@@ -10,4 +10,4 @@ paragraphRouter.put('/:id', updateParagraph);
 paragraphRouter.delete('/:id', deleteParagraph);
 
 // AI 단락 재생성
-paragraphRouter.post('/:id/regernerate', regenerateAiParagraph);
+paragraphRouter.post('/:id/regenerate', regenerateAiParagraph);

@@ -9,19 +9,18 @@ import { StatusCodes } from 'http-status-codes';
 export async function updateParagraph(req: Request, res: Response, next: NextFunction) {
     try {
         const repo = AppDataSource.getRepository(Paragraph);
-        const paragraph = await repo.findOneBy({ id: Number(req.params.id) });
+        // 내용만 수정 가능
+        if (req.body.content !== undefined) {
+            await repo.update({ id: Number(req.params.id) }, { content: req.body.content });
+        }
 
-        if (!paragraph) {
+        // 업데이트된 단락 반환
+        const updatedParagraph = await repo.findOneBy({ id: Number(req.params.id) });
+        if (!updatedParagraph) {
             return res.status(StatusCodes.NOT_FOUND).json({ message: 'Paragraph not found' });
         }
 
-        // 내용만 수정 가능 (writtenBy, orderIndex는 수정 불가)
-        if (req.body.content !== undefined) {
-            paragraph.content = req.body.content;
-        }
-
-        await repo.save(paragraph);
-        res.json(paragraph);
+        res.json(updatedParagraph);
     } catch (error) {
         next(error);
     }
@@ -88,8 +87,8 @@ export async function regenerateAiParagraph(req: Request, res: Response, next: N
             .sort((a, b) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0));
 
         // AI 텍스트 재생성 (옵션 파라미터 지원)
-        const temperature = req.body.temperature || 0.8;
-        const maxTokens = req.body.maxTokens || 500;
+        const temperature = req.body?.temperature || 0.9;
+        const maxTokens = req.body?.maxTokens || 500;
 
         const aiText = await generateNextParagraph(
             project,

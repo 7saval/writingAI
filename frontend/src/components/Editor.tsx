@@ -4,6 +4,7 @@ import { useParams } from "react-router-dom";
 import { fetchProjectParagraphs } from "../api/parapraphs.api";
 import { writeParagraph } from "../api/writing.api";
 import { StoryContextPanel } from "./StoryContextPanel";
+import ParagraphItem from "./ParagraphItem";
 
 function Editor() {
     const { projectId } = useParams(); // URL에서 projectId 가져오기
@@ -41,6 +42,25 @@ function Editor() {
         );
     }
 
+    // 단락 수정 핸들러
+    const handleUpdate = (id: number, newContent: string) => {
+        setParagraphs((prev) =>
+            prev.map((p) => (p.id === id ? { ...p, content: newContent } : p))
+        );
+    };
+
+    // 단락 삭제 핸들러
+    const handleDelete = (id: number) => {
+        setParagraphs((prev) => prev.filter((p) => p.id !== id));
+    };
+
+    // AI 재생성 핸들러
+    const handleRegenerate = (id: number, newContent: string) => {
+        setParagraphs((prev) =>
+            prev.map((p) => (p.id === id ? { ...p, content: newContent } : p))
+        );
+    };
+
 
     return (
         // flex-1 to take up remaining space, h-full to fill parent
@@ -49,16 +69,23 @@ function Editor() {
             <section className="flex flex-col overflow-hidden bg-white">
                 <div className="flex-1 space-y-4 overflow-y-auto p-6">
                     {paragraphs.map((p) => (
-                        <article
+                        // <article
+                        //     key={p.id}
+                        //     className={`rounded-xl border border-border px-4 py-3 ${p.writtenBy === 'user' ? 'bg-userBg' : 'bg-aiBg'
+                        //         }`}
+                        // >
+                        //     <strong className="text-sm text-slate-500">
+                        //         {p.writtenBy === 'user' ? '나' : 'AI'}
+                        //     </strong>
+                        //     <p className="mt-1 whitespace-pre-line text-slate-900">{p.content}</p>
+                        // </article>
+                        <ParagraphItem
                             key={p.id}
-                            className={`rounded-xl border border-border px-4 py-3 ${p.writtenBy === 'user' ? 'bg-userBg' : 'bg-aiBg'
-                                }`}
-                        >
-                            <strong className="text-sm text-slate-500">
-                                {p.writtenBy === 'user' ? '나' : 'AI'}
-                            </strong>
-                            <p className="mt-1 whitespace-pre-line text-slate-900">{p.content}</p>
-                        </article>
+                            paragraph={p}
+                            onUpdate={handleUpdate}
+                            onDelete={handleDelete}
+                            onRegenerate={handleRegenerate}
+                        />
                     ))}
                 </div>
                 {/* 입력 영역 */}

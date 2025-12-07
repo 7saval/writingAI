@@ -621,13 +621,14 @@ Week 2: █████░░░░░░░░░ 30%
 ### 📅 2025-12-07 (Day 11)
 
 #### 🎯 오늘의 목표
-- [ ] 프로젝트 수정/삭제 구현
-- [ ] 단락 관리 UI (수정/삭제/재생성)
+- [x] 프로젝트 수정/삭제 구현
+- [x] 단락 관리 UI (수정/삭제/재생성)
 - [ ] 시놉시스&설정집 삭제 구현
 - [ ] 홈 화면, 헤더 푸터 레이아웃 구현
 
 #### ✅ 완료한 작업
-- ✅ 
+- ✅ 프로젝트 수정/삭제 구현
+- ✅ 단락 관리 UI (수정/삭제/재생성)
   
   
 #### 작업 내용 상세
@@ -664,16 +665,80 @@ Week 2: █████░░░░░░░░░ 30%
   - m6 6: move to (상대 이동) - 현재 위치에서 상대적으로 (6, 6) 이동
   - 12 12: 상대적으로 (12, 12) 위치까지 선을 그립니다
   - 결과: 좌상단에서 우하단으로 대각선 /  
-  
+
 
 #### 💡 정리할 것
 - stopPropagation()
 - useNavigate()
 - useCallback()
+- createPortal()
 
 
-**새로 알게 된 개념**  
-1) 
+#### 💡 **개념 정리**  
+1) stopPropagation()
+- 이벤트의 전파(버블링)를 막는 메소드. HTML 요소들은 계층 구조로 되어 있어서, 자식 요소를 클릭하면 그 클릭 이벤트가 부모 요소로 계속 전달된다(Bubble up). 이걸 막지 않으면 의도치 않게 부모 요소의 클릭 이벤트까지 실행될 수 있다.
+
+- 프로젝트 사용 예시 (ProjectSidebar.tsx):  
+  - 프로젝트 목록의 각 항목은 전체가 클릭 가능한 <Link>(또는 클릭 이벤트가 있는 영역)로 감싸져 있다. 그런데 그 안에 있는 "삭제 버튼"이나 "수정 버튼"을 눌렀을 때, 프로젝트 페이지로 이동하면 안 될 것이다.
+
+```typescript
+// ProjectSidebar.tsx
+const handleDeleteProject = (e: React.MouseEvent, id: number) => {
+    e.preventDefault();   // 링크 이동 등 기본 동작 막기
+    e.stopPropagation();  // 중요: 클릭 이벤트가 부모(프로젝트 이동 링크)로 전달되는 것을 중단
+    
+    // ... 삭제 로직 실행 ...
+}
+```
+- 삭제 버튼을 눌렀을 때 **"프로젝트 페이지 이동"**이라는 부모의 동작이 실행되지 않도록 막아주는 역할  
+
+<br>
+
+2) useNavigate()
+- **페이지를 이동시키는 함수(Hook)** 
+- <Link> 컴포넌트는 사용자가 클릭해야만 이동하지만, navigate 함수는 특정 작업이 끝난 후 자동으로 이동시킬 때 유용
+```typescript
+// ProjectSidebar.tsx
+const navigate = useNavigate();
+// 프로젝트 생성 완료 후 자동 이동
+const handleCreateProject = (newProjectId: string) => {
+    // ...
+    navigate(`/projects/${newProjectId}/paragraphs`);
+};
+```
+<br>
+
+3) useCallback()
+- **함수를 메모이제이션**
+- 함수를 재사용할 때, 매번 새로운 함수를 생성하는 것이 아니라, 이전에 생성된 함수를 재사용
+- 프로젝트 사용 예시 (ProjectSidebar.tsx):  
+loadProjects 함수를 useEffect 안에서 호출하고 있는데, 만약 useCallback을 안 쓰면 컴포넌트가 렌더링될 때마다 loadProjects가 새로운 함수로 인식되어 useEffect가 계속 실행되거나(무한 루프), 의존성 관리가 어려워질 수 있다.  
+
+```typescript
+// ProjectSidebar.tsx
+const loadProjects = useCallback(() => {
+    fetchProjects().then(setProjects).catch(console.error);
+}, []); // [] : 처음 한 번만 함수를 만들고 계속 재사용함
+useEffect(() => {
+    loadProjects(); 
+}, [loadProjects]); // loadProjects 함수가 바뀌지 않으므로 안정적으로 실행됨
+```
+<br>
+  
+4) createPortal()  
+- **부모 컴포넌트의 DOM 트리 외부에 자식 컴포넌트를 렌더링**
+- 모달, 툴팁, 툴바 등의 UI 요소를 렌더링할 때 사용
+- 프로젝트 사용 예시 (Modal.tsx):  
+
+```typescript
+// Modal.tsx
+return createPortal(
+    <div className="fixed inset-0 z-50 ...">
+        {/* 모달 내용 */}
+    </div>,
+    document.body // 이 컴포넌트를 document.body 내부에 직접 렌더링하겠다는 의미
+);
+```
 
 ---
 #### 🔧 해결한 문제
@@ -683,21 +748,37 @@ Week 2: █████░░░░░░░░░ 30%
 
 **해결**: handleProjectCreated 함수에서 navigate로 새 프로젝트id로 이동하도록 했다. NewProjectModal에서 새로 생성된 프로젝트의 ID를 콜백으로 전달하고 있었기 때문에, 그 ID를 사용해서 해당 프로젝트로 라우팅하도록 했다.
 
+---
+**문제2**: 단락 수정 시 500 서버 에러가 발생 
+
+**원인**: findOneBy로 단락을 조회할 때 project 관계를 가져오지 않았다.
+repo.save(paragraph)를 호출하는 순간, TypeORM은 이 엔티티가 완전한지 검사한다. 이때 Paragraph 엔티티 설정에 project가 필수(nullable: false) 로 되어 있는데, **현재 객체에 project 정보가 없어서** "불완전한 데이터"로 판단하고 에러(500) 를 발생시킨 것.
+
+**해결**: repo.save대신 repo.update를 사용. repo.update({ id: ... }, { content: ... })는 단순히 "ID가 이거인 행의 content 컬럼만 바꿔줘" 라는 SQL을 날린다. project 컬럼은 건드리지 않으므로, 관계가 로드되어 있든 없든 상관없이 수정이 성공
 
 
-**참고 링크**:
+
+| 특징 |	repo.save(entity) |	repo.update(criteria, partialEntity) |
+| --- | --- | --- |
+동작 방식	| 엔티티를 조회(SELECT) 하고, 변경 사항이 있으면 저장(INSERT/UPDATE) 합니다. | 조건에 맞는 데이터에 대해 직접 SQL UPDATE 쿼리를 실행합니다. |
+유효성 검사	| 엔티티의 모든 제약 조건(Not Null 관계 등)을 검사합니다. | 변경하려는 필드만 업데이트하므로, 다른 필드의 제약 조건에 영향을 덜 받습니다. |
+릴레이션(관계)	| 필수 관계(project 등)가 로드되어 있지 않으면 에러가 발생할 수 있습니다. | 관계가 로드되어 있지 않아도, 해당 컬럼을 건드리지 않으면 문제없습니다. |
+성능	| 두 번 이상의 쿼리(SELECT + UPDATE)가 실행될 수 있어 상대적으로 느립니다. | 한 번의 UPDATE 쿼리만 실행되므로 빠릅니다. |
+반환값	| 저장된 전체 엔티티 객체를 반환합니다. | 업데이트 결과 정보(영향받은 행의 개수 등)를 반환합니다. (엔티티 반환 X) |
+
 
 #### 📌 내일 할 일
-- [ ] 프로젝트 수정/삭제 구현
-- [ ] 단락 관리 UI (수정/삭제/재생성)
 - [ ] 시놉시스&설정집 삭제 구현
 - [ ] 홈 화면, 헤더 푸터 레이아웃 구현
 
 #### 🚨 이슈/질문
-- 
+- AI 단락 재생성 시 옵션(temperature, max_token)을 화면에서 어떻게 전달해야할지 고민
+- 사용자정의 프롬프트를 어떻게 전달할지도 고민
+- AI 생성 혹은 재생성 시 화면상 로딩 상태를 어떻게 보여줄지 고민해볼 것
+- AI 생성 혹은 재생성 시 글씨가 실시간으로 작성되는 애니메이션 고려
 
 
 #### 📊 진행률
-Week 2: █████░░░░░░░░░ 30%
+Week 2: ██████░░░░░░░░ 50%
 
 ---

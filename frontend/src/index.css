@@ -29,3 +29,17 @@
 .custom-scrollbar::-webkit-scrollbar-thumb {
   @apply rounded-full bg-slate-300 hover:bg-slate-400;
 }
+
+/* 재생성 중 애니메이션 */
+@keyframes regenerating-blink {
+  0%, 100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.regenerating {
+  animation: regenerating-blink 1.5s ease-in-out infinite;
+}
