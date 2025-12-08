@@ -67,7 +67,7 @@ function Editor() {
         <div className="flex h-full w-full flex-col">
             {/* 메인 글쓰기 영역 */}
             <section className="flex flex-col overflow-hidden bg-white">
-                <div className="flex-1 space-y-4 overflow-y-auto p-6">
+                <div className="flex-1 space-y-4 overflow-y-auto p-6 custom-scrollbar">
                     {paragraphs.map((p) => (
                         // <article
                         //     key={p.id}

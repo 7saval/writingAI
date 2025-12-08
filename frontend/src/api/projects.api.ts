@@ -38,7 +38,7 @@ export const fetchProjectContexts = async (projectId: number) => {
 }
 
 // 컨텍스트 수정
-export const updateContext = async (projectId: number, data: Project) => {
+export const updateContext = async (projectId: number, data: Partial<Project>) => {
     const response = await apiClient.put(`/projects/${projectId}/context`, data);
     return response.data;
 }

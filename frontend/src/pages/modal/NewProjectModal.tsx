@@ -1,6 +1,6 @@
 import { useState } from "react"
-import { createProject } from "../api/projects.api"
-import { Modal } from "../components/common/Modal";
+import { createProject } from "../../api/projects.api"
+import { Modal } from "../../components/common/Modal";
 
 interface NewProjectModalProps {
   open: boolean

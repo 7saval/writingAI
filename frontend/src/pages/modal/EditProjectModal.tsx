@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react"
-import { updateProject } from "../api/projects.api"
-import { Modal } from "../components/common/Modal";
-import type { Project } from "../types/database";
+import { updateProject } from "../../api/projects.api"
+import { Modal } from "../../components/common/Modal";
+import type { Project } from "../../types/database";
 
 interface EditProjectModalProps {
     project: Project | null;

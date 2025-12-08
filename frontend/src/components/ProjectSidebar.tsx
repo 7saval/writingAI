@@ -2,8 +2,8 @@ import { useEffect, useState, useCallback } from "react";
 import type { Project } from "../types/database";
 import { deleteProject, fetchProjects } from "../api/projects.api";
 import { Link, useNavigate } from "react-router-dom";
-import { NewProjectModal } from "../pages/NewProjectModal";
-import { EditProjectModal } from "../pages/EditProjectModal";
+import { NewProjectModal } from "../pages/modal/NewProjectModal";
+import { EditProjectModal } from "../pages/modal/EditProjectModal";
 
 interface Props {
     // onNewProject는 이제 내부에서 처리하므로 선택적 prop으로 변경하거나 제거할 수 있지만, 

@@ -30,3 +30,6 @@ export interface LoreNote {
     tags: string[];
     includeInPrompt?: boolean;
 }
+
+export type ProjectSynopsis = Pick<Project, "id" | "synopsis">;
+export type ProjectLorebook = Pick<Project, "id" | "lorebook">;
