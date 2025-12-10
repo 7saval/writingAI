@@ -6,6 +6,8 @@ import { StatusCodes } from "http-status-codes";
 import { generateNextParagraph } from "../services/aiService";
 
 export async function writeWithAi(req: Request, res: Response, next: NextFunction) {
+    console.log("writeWithAi called", req.body);
+
     try {
         const projectRepo = AppDataSource.getRepository(Project);
         const paragraphRepo = AppDataSource.getRepository(Paragraph);
@@ -31,13 +33,19 @@ export async function writeWithAi(req: Request, res: Response, next: NextFunctio
         });
         await paragraphRepo.save(userParagraph);
 
+        console.log("Before AI:", project, project.paragraphs);
         // 2. AI가 다음 단락 생성
         const aiText = await generateNextParagraph(project, [...project.paragraphs, userParagraph]);
+
+        console.log("After AI:", aiText);
+        if (!aiText || aiText.trim() === '') {
+            return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'AI paragraph generation failed' });
+        }
 
         // 3. AI 단락 저장
         const aiParagraph = paragraphRepo.create({
             project,
-            content: aiText?.trim(),
+            content: aiText.trim(),
             writtenBy: 'ai',
             orderIndex: project.paragraphs.length + 1,
         });

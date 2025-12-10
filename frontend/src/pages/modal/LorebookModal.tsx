@@ -149,16 +149,6 @@ export function LorebookModal({ projectId, open, onOpenChange }: LorebookModalPr
                                         placeholder="태그 입력 후 Enter"
                                     />
                                 </div>
-
-                                <label className="flex items-center gap-2 text-xs text-slate-600">
-                                    <input
-                                        type="checkbox"
-                                        className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
-                                        checked={note.includeInPrompt ?? true}
-                                        onChange={(e) => updateNote(idx, { includeInPrompt: e.target.checked })}
-                                    />
-                                    AI 컨텍스트 포함
-                                </label>
                             </div>
                         ))}
                     </>
