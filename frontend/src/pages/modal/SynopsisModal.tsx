@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import { Modal } from "../../components/common/Modal"
 import { fetchProjectContexts, updateContext } from "../../api/projects.api";
-import { useStoryContext } from "../../hooks/useStoryContext";
+import { useSynopsis } from "../../hooks/useSynopsis";
 
 interface SynopsisModalProps {
     projectId: number;
@@ -12,14 +12,10 @@ interface SynopsisModalProps {
 export function SynopsisModal({ projectId, open, onOpenChange }: SynopsisModalProps) {
 
     const { synopsis,
-        lorebook,
         isSubmitting,
         isLoading,
         saveContext,
-        createNote,
-        deleteNote,
-        updateNote,
-        updateSynopsis } = useStoryContext(projectId);
+        updateSynopsis } = useSynopsis(projectId);
 
     return (
         <Modal

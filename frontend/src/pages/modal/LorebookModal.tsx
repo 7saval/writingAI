@@ -1,6 +1,6 @@
 import { Modal } from "../../components/common/Modal";
 import { CATEGORY_OPTIONS } from "../../constants/categoryOptions";
-import { useStoryContext } from "../../hooks/useStoryContext";
+import { useLorebook } from "../../hooks/useLorebook";
 import { useState } from "react";
 
 interface LorebookModalProps {
@@ -22,7 +22,7 @@ export function LorebookModal({ projectId, open, onOpenChange }: LorebookModalPr
         updateTagInput,
         handleRemoveTag,
         handleTagKeyDown,
-        getTagColor } = useStoryContext(projectId);
+        getTagColor } = useLorebook(projectId);
 
     return (
         <Modal

@@ -3,8 +3,7 @@ import type { LoreNote } from '../types/database';
 import { CATEGORY_OPTIONS } from '../constants/categoryOptions';
 import { fetchProjectContexts, updateContext } from '../api/projects.api';
 
-export const useStoryContext = (projectId: number) => {
-    const [synopsis, setSynopsis] = useState('');
+export const useLorebook = (projectId: number) => {
     const [lorebook, setLorebook] = useState<LoreNote[]>([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
@@ -16,7 +15,6 @@ export const useStoryContext = (projectId: number) => {
         fetchProjectContexts(projectId)
             .then((contexts) => {
                 setLorebook(contexts.lorebook || []);
-                setSynopsis(contexts.synopsis || '');
             })
             .catch((error) => {
                 console.error("Failed to fetch context", error);
@@ -32,7 +30,7 @@ export const useStoryContext = (projectId: number) => {
 
         try {
             setIsSubmitting(true);
-            await updateContext(projectId, { synopsis, lorebook });
+            await updateContext(projectId, { lorebook });
             alert("저장되었습니다.");
         } catch (error) {
             console.error("Failed to save context", error);
@@ -60,10 +58,6 @@ export const useStoryContext = (projectId: number) => {
         const next = [...lorebook];
         next[idx] = { ...next[idx], ...updates };
         setLorebook(next);
-    }
-
-    const updateSynopsis = (value: string) => {
-        setSynopsis(value);
     }
 
     const updateTagInput = (id: string, value: string) => {
@@ -117,7 +111,6 @@ export const useStoryContext = (projectId: number) => {
     };
 
     return {
-        synopsis,
         lorebook,
         isSubmitting,
         isLoading,
@@ -127,7 +120,6 @@ export const useStoryContext = (projectId: number) => {
         deleteNote,
         updateNote,
         updateTagInput,
-        updateSynopsis,
         handleAddTag,
         handleRemoveTag,
         handleTagKeyDown,
