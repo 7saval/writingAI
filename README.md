@@ -54,30 +54,6 @@ writingAI/
 │   └── package.json
 │
 ├── frontend/                   # React SPA 애플리케이션
-│   ├── src/
-│   │   ├── main.tsx           # React 진입점
-│   │   ├── App.tsx            # 라우터 설정
-│   │   ├── pages/             # 페이지 컴포넌트
-│   │   ├── components/        # 재사용 가능한 컴포넌트
-│   │   ├── api/               # API 클라이언트
-│   │   ├── hooks/             # Custom React hooks
-│   │   ├── types/             # TypeScript 타입 정의
-│   │   └── styles/            # 전역 스타일
-│   └── package.json
-writingAI/
-├── backend/                    # Express API 서버
-│   ├── src/
-│   │   ├── index.ts           # 서버 진입점
-│   │   ├── data-source.ts     # TypeORM 설정
-│   │   ├── entity/            # 데이터베이스 엔티티
-│   │   ├── controllers/       # 비즈니스 로직
-│   │   ├── routes/            # API 라우트
-│   │   ├── services/          # 서비스 (AI 통합)
-│   │   ├── middleware/        # 미들웨어 (에러 처리)
-│   │   └── migrations/        # DB 마이그레이션
-│   └── package.json
-│
-├── frontend/                   # React SPA 애플리케이션
     ├── src/
     │   ├── main.tsx           # React 진입점
     │   ├── App.tsx            # 라우터 설정
