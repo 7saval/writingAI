@@ -3,6 +3,10 @@
 
 .antigravityrules
 
+# Claude Code
+.claude/
+CLAUDE.md
+
 ### Node ###
 # Logs
 logs
