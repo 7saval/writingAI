@@ -341,3 +341,82 @@ Week 3: ████████░░░░░ 65%
 Week 3: ████████░░░░░ 65%
 
 ---
+
+### 📅 2025-12-11 (Day 15)
+
+#### 🎯 오늘의 목표
+- [x] 모달 열고 닫을 때 스크롤 막힘 버그 해결
+
+#### ✅ 완료한 작업
+- ✅ 모달 스크롤 막힘 버그 해결
+
+**작업 내용 상세**
+
+#### 🔧 해결한 문제
+
+**문제**: 모달(시놉시스, 설정집)을 열었다 닫으면 전체 페이지 스크롤이 되지 않는 버그
+
+**원인 분석**:
+1. WritingSession에서 `<div className="flex h-screen w-full overflow-hidden">`으로 고정 높이 설정
+2. Modal에서 `document.body.style.overflow = "hidden"` 처리
+3. 모달 닫힐 때 overflow 복원되어도, WritingSession 자체가 `h-screen` + `overflow-hidden`이라 페이지 스크롤 불가능
+4. 여러 모달을 동시에 열 수 없어 카운팅 로직도 불필요했음
+
+**처음 시도한 해결책 (실패)**:
+- Modal.tsx에 `modalCount` 전역 카운터 추가하여 모든 모달 닫혔을 때만 overflow 복원
+  - 문제: WritingSession의 구조적 문제라 body 컨트롤만으로는 해결 불가
+
+**최종 해결책 (성공)**:
+1. **Layout.tsx 구조 개선**: Flex 기반의 고정 레이아웃
+   ```jsx
+   <div className="flex flex-col h-screen overflow-hidden">
+       <Header />                              {/* 고정 높이 */}
+       <div className="flex-1 overflow-y-auto">{/* 가운데만 스크롤 */}
+           {children}
+       </div>
+       <Footer />                              {/* 고정 높이 */}
+   </div>
+   ```
+   - `h-screen` + `overflow-hidden`: 전체 페이지 스크롤 방지
+   - `flex-1` + `overflow-y-auto`: 가운데 content만 스크롤 가능
+   - Header, Footer는 항상 화면에 표시
+
+2. **WritingSession.tsx 조정**:
+   - `min-h-screen` → `h-full` (Layout의 flex-1 컨테이너에 맞춤)
+   - 내부 3개 섹션(`flex-[2]`, `flex-[6]`, `flex-[2]`)은 `overflow-hidden` 유지
+
+3. **Modal.tsx 단순화**:
+   - `body.overflow` 제어 완전 제거
+   - 이제 Layout에서 관리하므로 불필요
+
+**배운 점**:
+- CSS 레이아웃 문제는 구조에서부터 해결해야 함
+- 부분적 수정(`body.overflow`)으로는 근본 원인을 해결하지 못함
+- 전체 페이지 레이아웃 구조를 먼저 설계하는 것이 중요
+
+#### 💡 **개념 정리**
+
+1) **Flexbox 고정 레이아웃 패턴**
+   - `h-screen + overflow-hidden`: 전체 화면 고정
+   - `flex-col`: 수직 방향 정렬
+   - `flex-1`: 남은 공간을 모두 차지 (자동 계산)
+   - 이 조합으로 Header, Footer 고정 + 가운데 content 스크롤 구현
+
+2) **CSS overflow 제어 시 주의사항**
+   - 부모 요소의 overflow 설정이 자식의 스크롤 가능성을 결정
+   - `overflow: hidden` (고정된 높이) + `overflow: hidden` (스크롤 방지) = 스크롤 불가능
+   - `overflow: hidden` (고정된 높이) + `overflow-y: auto` (스크롤 활성) = 스크롤 가능
+   - body 컨트롤은 body 자체가 스크롤 불가능하면 의미 없음
+
+#### 📌 내일 할 일
+- [ ] 사용자 인증 시스템 구현
+- [ ] 백엔드 에러 핸들링 개선
+- [ ] 추가 기능 테스트
+
+#### 🚨 이슈/질문
+- 모달 스크롤 문제 해결됨 ✅
+
+#### 📊 진행률
+Week 3: ███████████░░░ 80%
+
+---

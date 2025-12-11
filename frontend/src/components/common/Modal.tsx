@@ -16,12 +16,9 @@ export function Modal({ open, onOpenChange, title, description, children, footer
     useEffect(() => {
         if (open) {
             setIsVisible(true);
-            // 모달이 열릴 때 body 스크롤 방지
-            document.body.style.overflow = "hidden";
         } else {
             // 애니메이션을 위해 잠시 대기
             const timer = setTimeout(() => setIsVisible(false), 200);
-            document.body.style.overflow = "unset";
             return () => clearTimeout(timer);
         }
     }, [open]);

@@ -7,7 +7,7 @@ import { StoryContextPanel } from "../components/StoryContextPanel";
 function WritingSession() {
     const { projectId } = useParams(); // URL에서 projectId 가져오기
     return (
-        <div className="flex h-screen w-full overflow-hidden bg-background">
+        <div className="flex w-full h-full bg-background">
             {/* leftSidebar - 프로젝트바 */}
             <div className="flex-[2] overflow-hidden">
                 <ProjectSidebar

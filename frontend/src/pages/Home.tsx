@@ -6,7 +6,7 @@ function Home() {
     return (
         <div className="min-h-screen bg-background">
             <main className="container mx-auto px-4">
-                <div className="flex flex-col items-center justify-center min-h-[calc(100vh-80px)] py-12 text-center">
+                <div className="flex flex-col items-center justify-center py-12 text-center">
                     <div className="mb-8 inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-2 text-sm text-primary">
                         <Sparkles className="h-4 w-4" />
                         <span>AI와 함께하는 창작의 새로운 경험</span>
