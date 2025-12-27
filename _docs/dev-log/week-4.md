@@ -85,23 +85,219 @@ Week 4: ███████████░░░ 80%
 ### 📅 2025-12-27 (Day 17)
 
 #### 🎯 오늘의 목표
-- [ ] 로그인, 회원가입, 비밀번호 찾기 API 구현
+- [x] 로그인, 회원가입, 비밀번호 찾기 API 구현
 - [ ] 로그인, 회원가입 react-hook-form으로 구현
 - [ ] 구글 OAuth 구현
 
 #### ✅ 완료한 작업
-- ✅ 
+- ✅ 로그인, 회원가입, 비밀번호 찾기, 초기화 API 구현 및 postman 테스트
+- ✅ 프론트 인증 훅 구현
+- ✅ 회원가입 페이지 UI 구현
 
 
 #### 📝 작업 상세
-- 
+[백엔드]
 
+- bcrypt 모듈로 비밀번호 해싱 작업
+    - `npm i --save-dev @types/bcrypt` 로 모듈 설치
+    - bcrypt.hash : 비밀번호 해싱
+    - bcrypt.compare : 비밀번호 일치 여부 확인
+```typescript
+// 회원가입 시
+const repo = AppDataSource.getRepository(User);
+const { email, password, username } = req.body;
+const hashed = await bcrypt.hash(password, 10); // 비밀번호 해싱 (보안 강화)
+const user = repo.create({ email, username, password: hashed });
+await repo.save(user);
 
+// 로그인 시
+// 비밀번호 일치 여부
+const isMatch = await bcrypt.compare(password, user.password);
+if (!isMatch) return res.status(StatusCodes.UNAUTHORIZED).json({
+    message: '이메일 또는 비밀번호가 일치하지 않습니다.'
+});
+```
+
+- 로그인 시 jwt 토큰 발급
+    - `npm i --save-dev @types/jsonwebtoken` 로 모듈 설치
+    - typescript 사용 시 타입을 잘 지정해줘야 함
+
+```typescript
+// JWT 토큰 발급
+const token = jwt.sign({
+    id: user.id,
+    email: user.email
+}, process.env.JWT_SECRET!, {
+    expiresIn: process.env.JWT_EXPIRES_IN as any
+});
+```
+
+- 비밀번호 찾기
+    - Math.random()으로 인증코드 생성
+    - DB에 인증코드와 인증코드 만료시간(resetCode, resetCodeExpires) 저장
+
+```typescript
+// 인증코드 생성 (6자리 숫자)
+const code = Math.floor(100000 + Math.random() * 900000).toString();
+
+// DB에 저장
+user.resetCode = code;
+user.resetCodeExpires = new Date(Date.now() + 3600 * 1000); // 1시간 후
+await repo.save(user);
+
+// 이메일 발송
+console.log(`인증코드: ${code}`);
+// await emailService.send(email, '비밀번호 초기화 인증코드', code);
+
+```
+
+- 비밀번호 초기화
+    - 인증코드 검증 : string으로 타입 변경
+    - 만료 시간 검증
+    - 비밀번호 해시 적용해 변경
+    - 인증코드 초기화
+
+```typescript
+// 코드 검증
+if (user.resetCode !== code.toString()) {
+    return res.status(StatusCodes.BAD_REQUEST).json({
+        message: '인증코드가 일치하지 않습니다.'
+    });
+}
+
+// 만료 시간 검증
+if (!user.resetCodeExpires || user.resetCodeExpires < new Date()) {
+    return res.status(StatusCodes.BAD_REQUEST).json({
+        message: '인증코드가 만료되었습니다.'
+    });
+}
+
+// 비밀번호 변경
+const hashed = await bcrypt.hash(newPassword, 10);
+user.password = hashed;
+
+// 인증코드 초기화
+user.resetCode = null;
+user.resetCodeExpires = null;
+
+// 저장
+await repo.save(user);
+
+```
+
+[프론트엔드]
+- 로컬 스토리지에 토큰 저장 및 가져오는 함수 생성 => zustand로 액션함수 셋팅
+
+```typescript
+export const setToken = (token: string) => {
+    localStorage.setItem('token', token);
+};
+
+export const getToken = () => {
+    return localStorage.getItem('token');
+};
+
+export const removeToken = () => {
+    localStorage.removeItem('token');
+};
+
+// set함수로 상태 변경
+export const useAuthStore = create<StoreState>((set) => ({
+    isLoggedIn: getToken() ? true : false,  // 초기값
+    storeLogin: (token: string) => {
+        set(() => ({ isLoggedIn: true }));
+        setToken(token);
+    },
+    storeLogout: () => {
+        set(() => ({ isLoggedIn: false }));
+        removeToken();
+    }
+}));
+```
+- axios 인터셉트 사용
+    - 사용 이유 : 이 코드를 작성해두면, API를 호출할 때마다 헤더에 토큰을 넣어줄 필요가 없어진다. 죽, 로그인된 사용자라면 모든 요청에 자동으로 신분증(토큰)을 붙여서 보내는 자동화 설정
+    - 원래는 axios.create에 헤더를 추가했는데, 요청 인터셉트를 추가하여 매 요청마다 최신 토큰을 헤더에 삽입
+    
+
+        ```typescript
+        // 변경 전
+        const axiosInstance = axios.create({
+            // baseURL: process.env.REACT_APP_API_URL ?? 'http://localhost:5000/api',
+            baseURL: import.meta.env.VITE_API_URL ?? 'http://localhost:5000/api',
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: getToken() ? `Bearer ${getToken()}` : "",
+            },
+            ...config,
+        });
+        ```
+
+        ```typescript
+        // 변경 후
+        // 요청 인터셉터 : 매 요청마다 최신 토큰 헤더에 추가
+        axiosInstance.interceptors.request.use((config) => {
+            const token = getToken();
+            if (token) {
+                config.headers.Authorization = `Bearer ${token}`;
+            }
+            return config;
+        })
+        ```
+
+---
 #### 💡 **개념 정리**
-1) 
+1) bcrypt란?
+- bcrypt는 단방향 해시 알고리즘입니다. 복호화가 불가능하며, 검증 시에는 저장된 해시에서 '솔트(Salt)'를 추출하여 입력된 비밀번호를 동일한 방식으로 다시 해싱한 뒤, 두 해시 값을 비교합니다  
+
+**① 단방향 암호화 (One-way Hash)**  
+설명: "비밀번호는 복호화될 필요가 없습니다. 오직 사용자가 입력한 값과 일치하는지만 알면 됩니다. 그래서 다시 평문으로 돌릴 수 없는 단방향 해시를 사용합니다."  
+**② 솔팅 (Salting)**  
+문제점: 같은 비밀번호(password123)는 항상 같은 해시값(a83fc...)을 가집니다. 해커들은 미리 계산된 표(Rainbow Table)를 이용해 원래 비밀번호를 찾아낼 수 있습니다.  
+해결: bcrypt는 해싱할 때마다 **랜덤한 데이터(Salt)**를 섞습니다.
+따라서 user A와 user B가 똑같이 비밀번호를 1234로 설정해도, DB에 저장되는 해시값은 서로 다릅니다.  
+**③ 키 스트레칭 & 워크 팩터 (Key Stretching & Work Factor)**  
+문제점: 컴퓨터 속도가 빨라져서 해커가 무차별 대입(Brute-force)으로 비밀번호를 뚫기 쉬워졌습니다.  
+해결: bcrypt는 일부러 연산을 느리게 만듭니다.
+Cost Factor(보통 10~12 사용)를 설정하여 해싱 한 번에 걸리는 시간을 조절합니다 (예: 0.1초).
+일반 사용자는 로그인에 0.1초가 걸려도 괜찮지만, 1억 개의 비밀번호를 대입해야 하는 해커에게는 치명적인 지연 시간이 됩니다.  
+
+**※ 용어 정리**
+- 해시 : 비밀번호를 알아볼 수 없게 변환하는 것
+- 솔트 : 똑같은 결과가 나오는 것을 막기 위해 섞는 랜덤값
+- 키 스트레칭 : 해커가 빨리 뚫지 못하게 억지로 시간을 끄는 과정
+- 코스트 팩터 : 키 스트레칭을 위한 반복 횟수를 조절하는 설정값
+
+2) bcrypt vs crypto
+- 가장 큰 차이점은 bcrypt는 비밀번호 저장을 위해 의도적으로 느리게 설계되었고, crypto는 데이터 보안 및 전송을 위해 빠르고 효율적으로 설계되었다는 점
+
+1. Bcrypt (비밀번호 해싱 특화)
+- 주목적: 사용자 비밀번호 저장.
+- 특징:
+    - 단방향 해싱: 암호화된 값을 다시 원본으로 돌릴 수 없습니다 (복호화 불가능).
+    - 의도적인 느림 (Work Factor): Salt Rounds 옵션을 통해 해싱 계산에 걸리는 시간을 조절할 수 있습니다. 이는 하드웨어 성능이 좋아져도 해커가 무차별 대입 공격(Brute Force)을 하기 어렵게 만듭니다.
+    - 자동 Salt: 해싱할 때마다 무작위 Salt(소금)를 자동으로 생성하여 포함하므로, 같은 비밀번호라도 매번 다른 해시값이 나옵니다.
+    - 알고리즘: Blowfish 암호화 알고리즘 기반.
+2. Crypto (범용 암호화 모듈)
+- 주목적: 데이터 무결성 검증, 양방향 암호화, 토큰 생성 등 광범위한 보안 작업. Node.js 내장 모듈입니다.
+- 기능:
+    - 해시 (Hash): SHA-256, SHA-512 등. 매우 빠르기 때문에 비밀번호 저장용으로 그대로 쓰면 위험합니다 (Rainbow Table 공격에 취약).
+    - 양방향 암호화 (Cipher/Decipher): AES 같은 알고리즘을 사용해 데이터를 암호화하고 다시 복호화할 수 있습니다. (예: 개인정보 DB 저장)
+    - HMAC: 비밀 키를 사용한 해싱 (데이터 위변조 방지).
+- 비밀번호 저장 시 주의: crypto 모듈의 pbkdf2나 scrypt를 사용하면 bcrypt처럼 안전하게 비밀번호를 저장할 수 있지만, 구현이 bcrypt보다 다소 복잡할 수 있습니다.
+
+<요약비교표>
+| 특징 | Bcrypt | Crypto (일반 해시 함수: SHA, MD5 등) |
+| --- | --- | --- |
+| 주사용처 | 비밀번호 저장 | 토큰 생성, 파일 무결성 체크, 양방향 데이터 암호화 |
+| 속도 | 느림 (보안을 위해 조절 가능) | 매우 빠름 (대용량 처리에 유리) |
+| 복호화 | 불가능 (단방향) | 가능 (AES 등) 또는 불가능 (SHA 등) |
+| Salt 처리 | 내장 (자동 생성 및 관리 편함) | 개발자가 직접 관리해야 함 |
+| 보안성 | Brute Force 공격에 매우 강함 | 일반 해시는 Brute Force에 취약 (PBKDF2 사용 시 보완 가능) |
+
 
 #### 📌 내일 할 일
-- [ ] 로그인, 회원가입, 비밀번호 찾기 API 구현
+- [ ] 로그인, 회원가입 api 설정
+- [ ] 비밀번호 찾기, 재설정 화면 및 기능 구현
 - [ ] 로그인, 회원가입 react-hook-form으로 구현
 - [ ] 구글 OAuth 구현
 
@@ -125,7 +321,32 @@ Week 4: ███████████░░░ 80%
 
 
 #### 🚨 이슈/질문
-- 
+- 비밀번호 초기화 시 PUT 대신 POST 쓰는 이유
+    - 인증 코드를 한 번 쓰면 만료시켜버리는 로직 때문에, 두 번 실행했을 때 결과가 다르므로(멱등하지 않으므로) PUT 대신 POST를 쓰는 것이 맞다.
+
+**1. 멱등성 (Idempotency) 위배**  
+RESTful API 설계에서 각 메서드의 중요한 특징은 다음과 같다.  
+- PUT: 멱등성이 있어야 합니다. 즉, 같은 요청을 여러 번 보내도 서버의 상태가 항상 동일해야 한다.
+- POST: 멱등성이 보장되지 않아도 된다. (요청할 때마다 새로운 리소스가 생성되거나 상태가 변할 수 있음)
+
+```typescript
+// ... 전략 ...
+// 인증코드 초기화 (한 번 사용된 코드는 삭제됨)
+user.resetCode = null;
+user.resetCodeExpires = null;
+await repo.save(user);
+```
+
+이 로직 때문에 첫 번째 요청은 성공하지만, 두 번째 요청은 실패(코드가 null이 되었으므로 "인증코드가 일치하지 않습니다" 에러 발생)하게 된다. 실행 횟수에 따라 결과가 달라지므로 멱등하지 않는다. 따라서 PUT보다는 POST가 적합하다.
+
+**2. 리소스 교체 vs 동작 수행 (Action)**  
+- PUT: 보통 /users/:id와 같이 특정 리소스 전체를 **교체(Replace)**할 때 사용
+- PATCH: 리소스의 일부분만 수정할 때 사용
+- POST: 리소스 생성뿐만 아니라, **복잡한 로직을 수행하는 프로세스(RPC 스타일)**를 처리할 때 범용적으로 사용
+
+reset-password는 단순히 데이터를 저장하는 것을 넘어, **[검증 -> 비밀번호 해싱 -> 토큰 만료 -> 저장]**이라는 일련의 '절차(Action)'를 수행하는 성격이 강하기 때문에 POST를 사용하는 것이 관례상 가장 적절
+
+
 
 #### 📊 진행률
 Week 4: ███████████░░░ 80%
