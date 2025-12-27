@@ -1551,6 +1551,68 @@ export async function login(req: Request, res: Response, next: NextFunction) {
     next(error);
   }
 }
+
+export async function requestPasswordReset(req: Request, res: Response, next: NextFunction) {
+  try {
+    const repo = AppDataSource.getRepository(User);
+    const { email } = req.body;
+    
+    const user = await repo.findOneBy({ email });
+    if (!user) {
+      // 보안상 사용자가 없어도 성공 메시지를 보내는 것이 좋을 수 있음 (이메일 열거 방지)
+      // 하지만 여기선 편의상 명시
+      return res.status(404).json({ message: '사용자를 찾을 수 없습니다.' });
+    }
+
+    // 1. 인증코드 생성 (6자리 숫자)
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    
+    // 2. DB에 저장 (User 엔티티에 resetCode, resetCodeExpires 컬럼 추가 필요)
+    user.resetCode = code;
+    user.resetCodeExpires = new Date(Date.now() + 1000 * 60 * 5); // 5분 유효
+    await repo.save(user);
+
+    // 3. 이메일 발송 (가상 코드)
+    console.log(`[Email Service] ${email}님 인증코드: ${code}`);
+    // await emailService.send(email, '비밀번호 초기화 인증코드', code);
+
+    res.json({ message: '인증 코드가 이메일로 발송되었습니다.' });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function resetPassword(req: Request, res: Response, next: NextFunction) {
+  try {
+    const repo = AppDataSource.getRepository(User);
+    const { email, code, newPassword } = req.body;
+
+    const user = await repo.findOneBy({ email });
+    if (!user) return res.status(404).json({ message: '사용자를 찾을 수 없습니다.' });
+
+    // 코드 검증
+    if (user.resetCode !== code) {
+      return res.status(400).json({ message: '인증 코드가 일치하지 않습니다.' });
+    }
+    if (!user.resetCodeExpires || user.resetCodeExpires < new Date()) {
+      return res.status(400).json({ message: '인증 코드가 만료되었습니다.' });
+    }
+
+    // 비밀번호 변경
+    const hashed = await bcrypt.hash(newPassword, 10);
+    user.password = hashed;
+    
+    // 인증 코드 초기화
+    user.resetCode = null;
+    user.resetCodeExpires = null;
+    
+    await repo.save(user);
+
+    res.json({ message: '비밀번호가 성공적으로 변경되었습니다.' });
+  } catch (error) {
+    next(error);
+  }
+}
 ```
 
 ### 4-2. 프론트 인증 훅 (간단 버전)
@@ -1575,7 +1637,198 @@ apiClient.interceptors.request.use((config) => {
 });
 ```
 
-### 4-3. 프로젝트 내보내기 (추가 기능 예시)
+### 4-3. 프론트엔드 인증 페이지 구현
+
+#### 1) 회원가입 페이지
+`src/pages/SignupPage.tsx`
+```tsx
+import { useState } from 'react';
+import { apiClient } from '../api/client';
+import { useNavigate } from 'react-router-dom';
+
+export function SignupPage() {
+  const navigate = useNavigate();
+  const [formData, setFormData] = useState({ email: '', password: '', username: '' });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await apiClient.post('/auth/register', formData);
+      alert('회원가입 성공! 로그인해주세요.');
+      navigate('/login');
+    } catch (err) {
+      alert('회원가입 실패');
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="mx-auto max-w-md space-y-4 py-10">
+      <h1 className="text-2xl font-bold">회원가입</h1>
+      <input 
+        className="w-full rounded border p-2" 
+        placeholder="이메일"
+        value={formData.email}
+        onChange={e => setFormData({...formData, email: e.target.value})}
+      />
+      <input 
+        className="w-full rounded border p-2" 
+        placeholder="사용자명"
+        value={formData.username}
+        onChange={e => setFormData({...formData, username: e.target.value})}
+      />
+      <input 
+        className="w-full rounded border p-2" 
+        type="password"
+        placeholder="비밀번호"
+        value={formData.password}
+        onChange={e => setFormData({...formData, password: e.target.value})}
+      />
+      <button className="btn-primary w-full">가입하기</button>
+    </form>
+  );
+}
+```
+
+#### 2) 로그인 페이지
+`src/pages/LoginPage.tsx`
+```tsx
+import { useState } from 'react';
+import { apiClient } from '../api/client';
+import { setToken } from '../utils/auth';
+import { useNavigate } from 'react-router-dom';
+
+export function LoginPage() {
+  const navigate = useNavigate();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await apiClient.post('/auth/login', { email, password });
+      setToken(res.data.token);
+      alert('로그인 성공');
+      navigate('/');
+    } catch (err) {
+      alert('로그인 실패');
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="mx-auto max-w-md space-y-4 py-10">
+      <h1 className="text-2xl font-bold">로그인</h1>
+      <input 
+        className="w-full rounded border p-2" 
+        placeholder="이메일"
+        value={email}
+        onChange={e => setEmail(e.target.value)}
+      />
+      <input 
+        className="w-full rounded border p-2" 
+        type="password"
+        placeholder="비밀번호"
+        value={password}
+        onChange={e => setPassword(e.target.value)}
+      />
+      <button className="btn-primary w-full">로그인</button>
+      <div className="flex justify-between text-sm">
+         <a href="/signup" className="text-primary">회원가입</a>
+         <a href="/forgot-password" className="text-slate-500">비밀번호 찾기</a>
+      </div>
+    </form>
+  );
+}
+```
+
+#### 3) 비밀번호 찾기 페이지
+`src/pages/ForgotPasswordPage.tsx`
+```tsx
+import { useState } from 'react';
+import { apiClient } from '../api/client';
+
+export function ForgotPasswordPage() {
+  const [email, setEmail] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await apiClient.post('/auth/reset-password-request', { email });
+      alert('인증 코드가 이메일로 발송되었습니다. 확인 후 비밀번호 재설정 페이지로 이동해주세요.');
+      // 실제로는 여기서 쿼리 파라미터로 이메일을 넘기거나 상태 관리를 할 수 있습니다.
+      window.location.href = `/reset-password?email=${encodeURIComponent(email)}`;
+    } catch (err) {
+      alert('요청 실패: 이메일을 확인해주세요.');
+    }
+  };
+
+  return (
+    <div className="mx-auto max-w-md space-y-4 py-10">
+      <h1 className="text-2xl font-bold">비밀번호 찾기</h1>
+      <p className="text-slate-600">가입한 이메일을 입력하시면 인증 코드를 보내드립니다.</p>
+      <input 
+        className="w-full rounded border p-2" 
+        placeholder="이메일"
+        value={email}
+        onChange={e => setEmail(e.target.value)}
+      />
+      <button onClick={handleSubmit} className="btn-primary w-full">인증 코드 받기</button>
+    </div>
+  );
+}
+```
+
+#### 4) 비밀번호 재설정 페이지
+`src/pages/ResetPasswordPage.tsx`
+```tsx
+import { useState } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
+import { apiClient } from '../api/client';
+
+export function ResetPasswordPage() {
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const [email] = useState(searchParams.get('email') || '');
+  const [code, setCode] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+
+  const handleSubmit = async () => {
+    try {
+      await apiClient.post('/auth/reset-password', { email, code, newPassword });
+      alert('비밀번호가 변경되었습니다. 로그인해주세요.');
+      navigate('/login');
+    } catch (err) {
+      alert('비밀번호 변경 실패: 코드를 확인해주세요.');
+    }
+  };
+
+  return (
+    <div className="mx-auto max-w-md space-y-4 py-10">
+      <h1 className="text-2xl font-bold">비밀번호 재설정</h1>
+      <input 
+        className="w-full rounded border p-2 bg-slate-100" 
+        value={email}
+        readOnly
+      />
+      <input 
+        className="w-full rounded border p-2" 
+        placeholder="인증 코드 6자리"
+        value={code}
+        onChange={e => setCode(e.target.value)}
+      />
+      <input 
+        className="w-full rounded border p-2" 
+        type="password"
+        placeholder="새 비밀번호"
+        value={newPassword}
+        onChange={e => setNewPassword(e.target.value)}
+      />
+      <button onClick={handleSubmit} className="btn-primary w-full">비밀번호 변경</button>
+    </div>
+  );
+}
+```
+
+### 4-4. 프로젝트 내보내기 (추가 기능 예시)
 백엔드 `projectController.ts`에:
 ```typescript
 export async function exportProject(req: Request, res: Response, next: NextFunction) {

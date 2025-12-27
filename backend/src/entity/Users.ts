@@ -16,6 +16,12 @@ export class User {
     @Column()
     username!: string;
 
+    @Column({ type: 'varchar', nullable: true })
+    resetCode?: string | null;
+
+    @Column({ type: 'datetime', nullable: true })
+    resetCodeExpires?: Date | null;
+
     @CreateDateColumn({ type: 'timestamp' })
     createdAt!: Date;
 
