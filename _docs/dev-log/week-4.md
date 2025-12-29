@@ -360,6 +360,7 @@ Week 4: ███████████░░░ 80%
 - [ ] 구글 OAuth 구현
 
 #### ✅ 완료한 작업
+- ✅ 회원가입 시 이메일 중복확인 구현
 - ✅ 
 
 
@@ -432,6 +433,30 @@ const handleCheckEmail = async () => {
 {emailError && <p className={`text-sm ${isEmailChecked ? 'text-green-600' : 'text-destructive'}`}>{emailError}</p>}
 ```
 
+- auth 관련 api 요청함수 auth.api.ts 공통파일로 리팩토링
+```typescript
+// 회원가입
+export const signup = async (data: SignupProps) => {
+    const response = await apiClient.post(`/auth/signup`, data);
+    return response.data;
+}
+
+// 이메일 중복 확인
+export const checkEmail = async (data: { email: string }) => {
+    const response = await apiClient.post(`/auth/check-email`, data);
+    return response.data;
+}
+
+// 로그인
+export const login = async (data: Omit<SignupProps, 'username'>) => {
+    const response = await apiClient.post<LoginResponse>(`/auth/login`, data);
+    return response.data;
+}
+```
+
+- 로그인 시 해당 유저네임 헤더에 뿌려주기
+
+
 ---
 #### 💡 **개념 정리**
 - 중복 이메일 가입 시 에러 상태코드를 409(CONFLICT)로 내려주는 것이 적합한 이유
@@ -448,6 +473,7 @@ const handleCheckEmail = async () => {
 - [ ] 구글 OAuth 구현
 
 #### 📌 디벨롭 사항
+- [ ] 사용자 인증 시 HttpOnly Cookie 설정
 - [ ] 글쓰기 애니메이션
 - [ ] 사용자정의 프롬프트 구현 
 - [ ] 사용자 인증 시스템 구현

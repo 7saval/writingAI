@@ -1,10 +1,16 @@
-import { apiClient } from "@/api/client";
+import { checkEmail, signup } from "@/api/auth.api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+
+export interface SignupProps {
+    username: string;
+    email: string;
+    password: string;
+}
 
 const Signup = () => {
     const [email, setEmail] = useState("")
@@ -24,18 +30,36 @@ const Signup = () => {
             return;
         }
 
-        try {
-            const response = await apiClient.post('/auth/check-email', { email });
-            setEmailError(response.data.message);
-            setIsEmailChecked(true);
-        } catch (error: any) {
-            setIsEmailChecked(false);
-            if (error.response && error.response.status === 409) {
-                setEmailError(error.response.data.message);
-            } else {
-                alert("중복 확인 중 오류가 발생했습니다.");
-            }
-        }
+        checkEmail({ email })
+            .then((res) => {
+                setEmailError(res.message);
+                setIsEmailChecked(true);
+            })
+            .catch((error) => {
+                setIsEmailChecked(false);
+                console.error('이메일 중복 확인 중 오류 발생:', error);
+                if (error.response && error.response.status === 409) {
+                    setEmailError(error.response.data.message);
+                } else {
+                    alert("중복 확인 중 오류가 발생했습니다.");
+                }
+            })
+            .finally(() => {
+                setIsLoading(false);
+            });
+
+        // try {
+        //     const response = await apiClient.post('/auth/check-email', { email });
+        //     setEmailError(response.data.message);
+        //     setIsEmailChecked(true);
+        // } catch (error: any) {
+        //     setIsEmailChecked(false);
+        //     if (error.response && error.response.status === 409) {
+        //         setEmailError(error.response.data.message);
+        //     } else {
+        //         alert("중복 확인 중 오류가 발생했습니다.");
+        //     }
+        // }
     }
 
     // 회원가입
@@ -57,21 +81,37 @@ const Signup = () => {
         }
 
         // 회원가입 API 호출
-        try {
-            await apiClient.post('/auth/signup', { username, email, password })
-            alert("회원가입이 완료되었습니다.");
-            navigate("/login");
-        } catch (error: any) {
-            console.error('회원가입 중 오류 발생:', error);
-            // 409 Conflict: 이미 가입된 이메일 (백엔드 메시지 사용)
-            if (error.response && error.response.status === 409) {
-                setError(error.response.data.message);
-            } else {
-                alert("회원가입에 실패했습니다.");
-            }
-        }
+        signup({ username, email, password })
+            .then((response) => {
+                alert("회원가입이 완료되었습니다.");
+                navigate("/login");
+            })
+            .catch((error) => {
+                console.error('회원가입 중 오류 발생:', error);
+                // 409 Conflict: 이미 가입된 이메일 (백엔드 메시지 사용)
+                if (error.response && error.response.status === 409) {
+                    setError(error.response.data.message);
+                } else {
+                    alert("회원가입에 실패했습니다.");
+                }
+            })
+            .finally(() => {
+                setIsLoading(false);
+            });
 
-        setIsLoading(false)
+        // try {
+        //     await apiClient.post('/auth/signup', { username, email, password })
+        //     alert("회원가입이 완료되었습니다.");
+        //     navigate("/login");
+        // } catch (error: any) {
+        //     console.error('회원가입 중 오류 발생:', error);
+        //     // 409 Conflict: 이미 가입된 이메일 (백엔드 메시지 사용)
+        //     if (error.response && error.response.status === 409) {
+        //         setError(error.response.data.message);
+        //     } else {
+        //         alert("회원가입에 실패했습니다.");
+        //     }
+        // }
     }
 
     return (
@@ -84,7 +124,7 @@ const Signup = () => {
                             <CardDescription>새로운 계정을 만드세요</CardDescription>
                         </CardHeader>
                         <CardContent>
-                            `<form onSubmit={handleSignUp}>
+                            <form onSubmit={handleSignUp}>
                                 <div className="flex flex-col gap-6">
                                     <div className="grid gap-2">
                                         <Label htmlFor="username">사용자명</Label>

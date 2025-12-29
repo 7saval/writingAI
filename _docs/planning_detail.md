@@ -1546,7 +1546,19 @@ export async function login(req: Request, res: Response, next: NextFunction) {
 
     // JWT 토큰 발급
     const token = jwt.sign({ sub: user.id }, process.env.JWT_SECRET!, { expiresIn: process.env.JWT_EXPIRES_IN });
+    
+    // [Current Implementation]
+    // 편의성을 위해 응답 본문(body)에 토큰을 포함하여 전달합니다.
+    // 클라이언트는 이를 localStorage에 저장하여 사용합니다.
     res.json({ token });
+
+    // [Future Improvement - HttpOnly Cookie]
+    // 보안 강화를 위해 추후 다음과 같이 쿠키로 변경할 예정입니다.
+    // res.cookie('token', token, { 
+    //   httpOnly: true,
+    //   secure: process.env.NODE_ENV === 'production',
+    //   maxAge: 1000 * 60 * 60 // 1시간
+    // }).send();
   } catch (error) {
     next(error);
   }
@@ -1615,7 +1627,16 @@ export async function resetPassword(req: Request, res: Response, next: NextFunct
 }
 ```
 
-### 4-2. 프론트 인증 훅 (간단 버전)
+### 4-2. 보안 개선 로드맵 (Future Work)
+> **중요**: 현재 구현은 개발 편의성을 위해 `localStorage` 방식을 채택했습니다. 서비스 배포 시점에는 다음과 같이 보안을 강화해야 합니다.
+
+1.  **HttpOnly Cookie 도입**
+    *   **문제점**: `localStorage`는 XSS(스크립트 삽입) 공격에 취약하여 토큰 탈취 위험이 있습니다.
+    *   **개선안**: 서버에서 토큰을 `res.cookie`로 전달하고 `httpOnly: true` 옵션을 설정합니다. 브라우저 JS가 쿠키에 접근할 수 없으므로 안전합니다.
+2.  **CSRF 방어**
+    *   쿠키 인증 사용 시 CSRF(사이트 간 요청 위조) 공격 가능성이 생기므로, `SameSite` 쿠키 설정이나 CSRF 토큰을 도입합니다.
+
+### 4-3. 프론트 인증 훅 (간단 버전)
 `src/utils/auth.ts`
 ```typescript
 export function setToken(token: string) {
@@ -1706,7 +1727,11 @@ export function LoginPage() {
     e.preventDefault();
     try {
       const res = await apiClient.post('/auth/login', { email, password });
+      
+      // [중요] 응답받은 토큰을 스토어(localStorage)에 저장
+      // 추후 HttpOnly Cookie 방식 사용 시 이 단계는 필요 없어짐 (브라우저가 자동 관리)
       setToken(res.data.token);
+      
       alert('로그인 성공');
       navigate('/');
     } catch (err) {

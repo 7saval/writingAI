@@ -1,7 +1,9 @@
+import { login } from "@/api/auth.api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useAuthStore } from "@/store/authStore";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
@@ -10,28 +12,40 @@ const Login = () => {
     const [password, setPassword] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
+    const { isLoggedIn, storeLogin, storeLogout } = useAuthStore();
     const navigate = useNavigate();
 
+    // 이메일 로그인
     const handleLogin = async (e: React.FormEvent) => {
-        e.preventDefault()
-        // const supabase = createClient()
+        e.preventDefault();
         setIsLoading(true);
         setError(null);
 
-        try {
-            // const { error } = await supabase.auth.signInWithPassword({
-            //     email,
-            //     password,
-            // })
-            // if (error) throw error
-            navigate("/projects");
-        } catch (error: unknown) {
-            setError(error instanceof Error ? error.message : "로그인에 실패했습니다");
-        } finally {
-            setIsLoading(false);
-        }
+        login({ email, password })
+            .then((res) => {
+                storeLogin(res.token);
+                navigate("/");
+            })
+            .catch((error) => {
+                setError(error.response?.data?.message || "로그인에 실패했습니다");
+            })
+            .finally(() => {
+                setIsLoading(false);
+            });
+
+        // try {
+        //     const res = await apiClient.post('/auth/login', { email, password });
+        //     storeLogin(res.data.token);
+        //     navigate("/");
+        // } catch (error: any) {
+        //     const message = error.response?.data?.message || "로그인에 실패했습니다";
+        //     setError(message);
+        // } finally {
+        //     setIsLoading(false);
+        // }
     }
 
+    // 구글 로그인
     const handleGoogleLogin = async () => {
         // const supabase = createClient()
         setIsLoading(true)

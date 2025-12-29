@@ -57,6 +57,11 @@ export async function login(req: Request, res: Response, next: NextFunction) {
             expiresIn: process.env.JWT_EXPIRES_IN as any
         });
 
+        // 쿠키에 토큰 담기 - 토큰 변수에 토큰 담기
+        res.cookie("token", token, {
+            httpOnly: true
+        });
+
         res.status(StatusCodes.OK).json({
             message: '로그인이 완료되었습니다.',
             token

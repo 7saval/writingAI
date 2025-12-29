@@ -1,4 +1,4 @@
-import { PenLine, User } from "lucide-react";
+import { LogOut, PenLine, User } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
@@ -7,8 +7,10 @@ import {
     DropdownMenuContent,
     DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
+import { useAuthStore } from "@/store/authStore";
 
 function Header() {
+    const { isLoggedIn, storeLogout } = useAuthStore();
     return (
         <header className="border-b border-border">
             <div className="container mx-auto px-4 py-4">
@@ -31,12 +33,19 @@ function Header() {
                                         글쓰기
                                     </Link>
                                 </DropdownMenuItem>
-                                <DropdownMenuItem asChild>
-                                    <Link to="/login" className="flex items-center gap-2 cursor-pointer">
-                                        <User className="h-4 w-4" />
-                                        로그인
-                                    </Link>
-                                </DropdownMenuItem>
+                                {isLoggedIn ? (
+                                    <DropdownMenuItem onClick={storeLogout} className="flex items-center gap-2 cursor-pointer">
+                                        <LogOut className="h-4 w-4" />
+                                        로그아웃
+                                    </DropdownMenuItem>
+                                ) : (
+                                    <DropdownMenuItem asChild>
+                                        <Link to="/login" className="flex items-center gap-2 cursor-pointer">
+                                            <User className="h-4 w-4" />
+                                            로그인
+                                        </Link>
+                                    </DropdownMenuItem>
+                                )}
                             </DropdownMenuContent>
                         </DropdownMenu>
                     </nav>
