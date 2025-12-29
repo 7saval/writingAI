@@ -352,3 +352,132 @@ reset-password는 단순히 데이터를 저장하는 것을 넘어, **[검증 -
 Week 4: ███████████░░░ 80%
 
 ---
+### 📅 2025-12-29 (Day 18)
+
+#### 🎯 오늘의 목표
+- [ ] 비밀번호 찾기, 초기화 구현
+- [ ] 로그인, 회원가입 react-hook-form으로 구현
+- [ ] 구글 OAuth 구현
+
+#### ✅ 완료한 작업
+- ✅ 
+
+
+#### 📝 작업 상세
+[백엔드]
+- 회원가입 시 이메일 중복 확인 에러 처리
+```typescript
+} catch (error: any) {
+    // 이메일 중복 에러 처리
+    if (error.code === 'ER_DUP_ENTRY' || (error.message && error.message.includes('Duplicate entry'))) {
+        return res.status(StatusCodes.CONFLICT).json({
+            message: '이미 가입된 이메일입니다.'
+        });
+    }
+```
+- 이메일 중복 확인 로직 추가
+```typescript
+// 이메일 중복 확인
+export async function checkEmail(req: Request, res: Response, next: NextFunction) {
+    try {
+        const repo = AppDataSource.getRepository(User);
+        const { email } = req.body;
+        const user = await repo.findOneBy({ email });
+
+        if (user) {
+            return res.status(StatusCodes.CONFLICT).json({
+                message: '이미 사용 중인 이메일입니다.'
+            });
+        }
+
+        return res.status(StatusCodes.OK).json({
+            message: '사용 가능한 이메일입니다.'
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+```
+
+[프론트엔드]
+- 회원가입 시 이메일 중복 확인 에러 처리
+    - setEmailError: 에러 메시지 설정
+    - setIsEmailChecked: 이메일 중복 확인 여부 설정
+    - email Input 값 OnChange 시 setEmailError 초기화
+```typescript
+// 이메일 중복 확인
+const handleCheckEmail = async () => {
+    if (!email) {
+        alert("이메일을 입력해주세요.");
+        return;
+    }
+
+    try {
+        const response = await apiClient.post('/auth/check-email', { email });
+        setEmailError(response.data.message);
+        setIsEmailChecked(true);
+    } catch (error: any) {
+        setIsEmailChecked(false);
+        if (error.response && error.response.status === 409) {
+            setEmailError(error.response.data.message);
+        } else {
+            alert("중복 확인 중 오류가 발생했습니다.");
+        }
+    }
+}
+```
+- className 조건부 동적 생성
+
+```typescript
+{emailError && <p className={`text-sm ${isEmailChecked ? 'text-green-600' : 'text-destructive'}`}>{emailError}</p>}
+```
+
+---
+#### 💡 **개념 정리**
+- 중복 이메일 가입 시 에러 상태코드를 409(CONFLICT)로 내려주는 것이 적합한 이유
+    - 해당 문제 발생 시 가장 표준적으로 사용되는 코드
+    - 의미: "요청이 현재 서버의 리소스 상태와 충돌하고 있습니다."
+    - 주 사용처: 이미 존재하는 데이터(ID, 이메일 등)를 다시 생성하려고 할 때.
+    - 이유: "이미 리소스가 존재하므로, 그 위에 덮어쓰거나 새로 만들 수 없다"는 서버의 상태를 표현함
+
+
+#### 📌 내일 할 일
+- [ ] 로그인, 회원가입 api 설정
+- [ ] 비밀번호 찾기, 재설정 화면 및 기능 구현
+- [ ] 로그인, 회원가입 react-hook-form으로 구현
+- [ ] 구글 OAuth 구현
+
+#### 📌 디벨롭 사항
+- [ ] 글쓰기 애니메이션
+- [ ] 사용자정의 프롬프트 구현 
+- [ ] 사용자 인증 시스템 구현
+- [ ] 백엔드 에러 핸들링 개선
+- [ ] 작성 글 내보내기
+- [ ] 배포하기
+
+
+#### 📝 피드백 내용
+- 글쓰기 애니메이션
+    - 스트림 형식 / 잘라서 눈속임
+
+- database.ts
+    - 타입 형식 : 카멜 - 스네이크 맞추기
+
+- ai 생성 시 스크롤 맨 밑으로 이동하도록 구현
+
+
+#### 🚨 이슈/질문
+- 회원가입 시 이메일 중복 발생 시 예외 처리
+    - [문제발생] 이메일 unique 값 설정으로 인해 데이터에 있는 이메일이 중복으로 들어갔을 경우 Duplicate entry 에러 발생
+    - [원인파악] 서버에서 데이터 무결성 위배에 대한 예외 처리를 하지 않았음
+    - [진행] 
+        - 회원가입 api 예외 처리 시 error.code === 'ER_DUP_ENTRY' 확인
+        - 에러 상태코드 409(CONFLICT)로 내려주고 에러 메시지 전달
+        - 프론트에서는 서버에서 내려준 statusCode가 409일 경우 error.response.data.message로 넘겨준 메세지값을 출력하도록 조치
+    - [결과]
+        - 회원가입 실패에 대한 원인을 사용자가 알 수 있도록 하여 사용자 경험 개선
+
+#### 📊 진행률
+Week 4: ███████████░░░ 83%
+
+---

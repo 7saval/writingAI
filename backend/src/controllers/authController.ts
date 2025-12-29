@@ -17,7 +17,14 @@ export async function signup(req: Request, res: Response, next: NextFunction) {
             message: '회원가입이 완료되었습니다.',
             id: user.id
         });
-    } catch (error) {
+    } catch (error: any) {
+        // 이메일 중복 에러 처리
+        if (error.code === 'ER_DUP_ENTRY' || (error.message && error.message.includes('Duplicate entry'))) {
+            return res.status(StatusCodes.CONFLICT).json({
+                message: '이미 가입된 이메일입니다.'
+            });
+        }
+
         console.error('회원가입 중 오류 발생:', error);
         res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
             message: '회원가입 중 오류가 발생했습니다.'
@@ -131,6 +138,27 @@ export async function resetPassword(req: Request, res: Response, next: NextFunct
 
         return res.status(StatusCodes.OK).json({
             message: '비밀번호가 성공적으로 변경되었습니다.'
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+
+// 이메일 중복 확인
+export async function checkEmail(req: Request, res: Response, next: NextFunction) {
+    try {
+        const repo = AppDataSource.getRepository(User);
+        const { email } = req.body;
+        const user = await repo.findOneBy({ email });
+
+        if (user) {
+            return res.status(StatusCodes.CONFLICT).json({
+                message: '이미 사용 중인 이메일입니다.'
+            });
+        }
+
+        return res.status(StatusCodes.OK).json({
+            message: '사용 가능한 이메일입니다.'
         });
     } catch (error) {
         next(error);
