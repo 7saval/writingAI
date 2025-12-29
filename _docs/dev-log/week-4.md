@@ -454,8 +454,46 @@ export const login = async (data: Omit<SignupProps, 'username'>) => {
 }
 ```
 
-- 로그인 시 해당 유저네임 헤더에 뿌려주기
+- 로그인 시 해당 유저네임 헤더에 뿌려주기  
+    (1) username을 localStorage에 저장하는 방법  
+    - Backend (authController.ts): 로그인 성공 시 응답에 username 포함  
+    - Frontend (auth.api.ts): 로그인 응답 타입(LoginResponse)에 user 객체(username 포함)를 추가  
+    - Frontend Store (authStore.ts): useAuthStore가 username을 상태 및 로컬 스토리지에 저장하고 관리하도록 업데이트  
+    - Frontend Page (Login.tsx): 로그인 성공 시 storeLogin 함수에 username을 함께 전달하도록 수정  
+    - Frontend Component (Header.tsx): 헤더의 유저 아이콘 옆에 로그인된 사용자의 username이 표시되도록 변경  
+    
+    (2) cookie(httpOnly)를 사용하는 방법
+    - Backend (package.json): `cookie-parser` 및 `@types/cookie-parser` 설치
+    - Backend (index.ts): `cookie-parser` 미들웨어 추가, CORS 설정에 `credentials: true` 확인
+    - Backend (authController.ts): 
+        - 로그인 성공 시 응답에 username 포함 (localStorage 방식과 동일)
+        - `logout` 함수 추가: `res.clearCookie("token")` 처리
+        - `verifyUser` 함수 추가: 쿠키에서 토큰 읽어 검증 후 유저 정보 반환
+    - Backend (authRoutes.ts): `POST /logout`, `GET /verify-user`, `POST /check-email` 라우트 추가
+    - Frontend (auth.api.ts): `logout()`, `verifyUser()` API 함수 추가
+    - Frontend (api/client.ts): `withCredentials: true` 설정 추가, 토큰 헤더 인터셉터 주석 처리
+    - Frontend Store (authStore.ts): 
+        - `storeLogin` 시그니처 변경: `(username: string)` (token 파라미터 제거)
+        - 초기값을 `false`/`null`로 설정 (새로고침 시 useEffect에서 verifyUser로 확인)
+        - localStorage 관련 로직 주석 처리
+    - Frontend (App.tsx): `useEffect`로 앱 초기 로드 시 `verifyUser()` 호출하여 인증 상태 확인
+    - Frontend Page (Login.tsx): 로그인 성공 시 `storeLogin(res.user.username)` 호출 (token 제거)
+    - Frontend Component (Header.tsx): 로그아웃 시 `logout()` API 호출 후 `storeLogout()` 실행
 
+    ```text
+    - [보안성] httpOnly 설정 시 자바스크립트(document.cookie)로 접근 불가하여 XSS 공격 방어에 유리
+    - [흐름]
+        1. 로그인: 서버가 Set-Cookie 헤더로 httpOnly 토큰 발급. 클라이언트는 별도로 토큰 저장 안 함 (isLoggedIn 상태만 관리)
+        2. 새로고침(초기 로드): 클라이언트가 GET /auth/verify-user 요청. 브라우저가 자동으로 쿠키 전송 -> 서버가 토큰 검증 후 유저 정보 반환 -> 클라이언트 스토어 업데이트
+        3. 로그아웃: 클라이언트가 POST /auth/logout 요청 -> 서버가 쿠키 삭제(Clear Cookie) -> 클라이언트 스토어 초기화
+    - [설정]
+        - Backend: cors({ credentials: true }), cookie-parser 미들웨어 필수
+        - Frontend: axios({ withCredentials: true }) 필수
+    ```
+
+    **[핵심 차이점]**
+    - 현재 (LocalStorage): "나 로그인했어, 여기 내 명찰(Token)이랑 이름(Username)이야." -> 브라우저가 주머니(LocalStorage)에 넣고 필요할 때마다 꺼내 봄.
+    - 쿠키 (HttpOnly): 서버가 브라우저에게 "이 금고(Cookie) 맡아줘. 단, 너는 절대 열어보지 마(HttpOnly)."라고 함. -> 브라우저는 금고 안에 뭐가 들었는지(Token이 뭔지, Username이 뭔지) 모름.
 
 ---
 #### 💡 **개념 정리**

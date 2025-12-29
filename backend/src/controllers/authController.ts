@@ -64,8 +64,56 @@ export async function login(req: Request, res: Response, next: NextFunction) {
 
         res.status(StatusCodes.OK).json({
             message: '로그인이 완료되었습니다.',
-            token
+            token,
+            user: {
+                username: user.username
+            }
         });
+    } catch (error) {
+        next(error);
+    }
+}
+
+// 로그아웃
+export async function logout(req: Request, res: Response, next: NextFunction) {
+    try {
+        res.clearCookie("token");
+        res.status(StatusCodes.OK).json({
+            message: '로그아웃이 완료되었습니다.'
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+
+// 사용자 인증
+export async function verifyUser(req: Request, res: Response, next: NextFunction) {
+    try {
+        const token = req.cookies?.token;
+        if (!token) return res.status(StatusCodes.UNAUTHORIZED).json({
+            message: '인증되지 않은 사용자입니다.'
+        });
+
+        try {
+            const decoded = jwt.verify(token, process.env.JWT_SECRET!) as jwt.JwtPayload;
+            const repo = AppDataSource.getRepository(User);
+            const user = await repo.findOneBy({ id: decoded.id });
+            if (!user) return res.status(StatusCodes.UNAUTHORIZED).json({
+                message: '인증되지 않은 사용자입니다.'
+            });
+            res.status(StatusCodes.OK).json({
+                message: '인증이 완료되었습니다.',
+                user: {
+                    username: user.username,
+                    email: user.email
+                }
+            });
+        } catch (error) {
+            res.status(StatusCodes.UNAUTHORIZED).json({
+                message: '세션이 만료되었습니다.'
+            });
+        }
+
     } catch (error) {
         next(error);
     }

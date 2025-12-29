@@ -5,6 +5,7 @@ import cors from 'cors';
 // import { testRouter } from './routes/testRoutes';
 import { router } from './routes';
 import { errorHandler } from './middleware/errorHandler';
+import cookieParser from 'cookie-parser';
 
 async function bootstrap() {
     await initDataSource();
@@ -15,6 +16,7 @@ async function bootstrap() {
         credentials: true,                  // 쿠키나 인증 헤더를 포함할 경우 true 설정
     }));
     app.use(express.json());
+    app.use(cookieParser());
     // app.use('/api/test', testRouter);
     app.use('/api', router);    // API 라우터 등록
     app.use(errorHandler);      // 에러 핸들러 등록 (맨 마지막에 위치)

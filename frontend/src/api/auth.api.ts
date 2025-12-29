@@ -16,10 +16,33 @@ export const checkEmail = async (email: Pick<SignupProps, 'email'>) => {
 // 로그인 반환 타입
 interface LoginResponse {
     token: string;
+    user: {
+        username: string;
+    };
 }
 
 // 로그인
 export const login = async (data: Omit<SignupProps, 'username'>) => {
     const response = await apiClient.post<LoginResponse>(`/auth/login`, data);
+    return response.data;
+}
+
+// 로그아웃
+export const logout = async () => {
+    const response = await apiClient.post(`/auth/logout`);
+    return response.data;
+}
+
+interface VerifyUserResponse {
+    message: string;
+    user: {
+        username: string;
+        email: string;
+    };
+}
+
+// 사용자인증
+export const verifyUser = async () => {
+    const response = await apiClient.get<VerifyUserResponse>(`/auth/verify-user`);
     return response.data;
 }

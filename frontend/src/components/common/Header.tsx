@@ -7,10 +7,20 @@ import {
     DropdownMenuContent,
     DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
+import { logout } from "@/api/auth.api";
 import { useAuthStore } from "@/store/authStore";
 
 function Header() {
-    const { isLoggedIn, storeLogout } = useAuthStore();
+    const { isLoggedIn, storeLogout, username } = useAuthStore();
+    const handleLogout = async () => {
+        try {
+            await logout();
+            storeLogout();
+        } catch (error) {
+            console.error(error);
+        }
+    }
+
     return (
         <header className="border-b border-border">
             <div className="container mx-auto px-4 py-4">
@@ -22,8 +32,9 @@ function Header() {
                     <nav className="flex items-center gap-2">
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button size="icon" variant="outline" className="rounded-full bg-transparent">
+                                <Button variant="outline" className="rounded-full bg-transparent gap-2 px-3 min-w-[40px]">
                                     <User className="h-4 w-4" />
+                                    {isLoggedIn && username && <span className="text-sm font-medium">{username}</span>}
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-48">
@@ -34,7 +45,8 @@ function Header() {
                                     </Link>
                                 </DropdownMenuItem>
                                 {isLoggedIn ? (
-                                    <DropdownMenuItem onClick={storeLogout} className="flex items-center gap-2 cursor-pointer">
+                                    // <DropdownMenuItem onClick={storeLogout} className="flex items-center gap-2 cursor-pointer">
+                                    <DropdownMenuItem onClick={handleLogout} className="flex items-center gap-2 cursor-pointer">
                                         <LogOut className="h-4 w-4" />
                                         로그아웃
                                     </DropdownMenuItem>

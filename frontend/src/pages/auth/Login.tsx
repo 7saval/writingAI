@@ -23,7 +23,8 @@ const Login = () => {
 
         login({ email, password })
             .then((res) => {
-                storeLogin(res.token);
+                // storeLogin(res.token, res.user.username);
+                storeLogin(res.user.username);
                 navigate("/");
             })
             .catch((error) => {
