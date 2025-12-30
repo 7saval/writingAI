@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 
 function Home() {
     return (
-        <div className="min-h-screen bg-background">
+        <div className="min-h-full bg-background">
             <main className="container mx-auto px-4">
                 <div className="flex flex-col items-center justify-center py-12 text-center">
                     <div className="mb-8 inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-2 text-sm text-primary">

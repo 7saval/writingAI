@@ -7,6 +7,11 @@ import { useAuthStore } from "@/store/authStore";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
+export interface LoginProps {
+    email: string;
+    password: string;
+}
+
 const Login = () => {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
