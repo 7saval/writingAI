@@ -3,8 +3,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useAuth } from "@/hooks/useAuth";
 import { useAuthStore } from "@/store/authStore";
 import { useState } from "react";
+import { useForm } from "react-hook-form";
 import { Link, useNavigate } from "react-router-dom";
 
 export interface LoginProps {
@@ -13,49 +15,67 @@ export interface LoginProps {
 }
 
 const Login = () => {
-    const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
-    const [error, setError] = useState<string | null>(null);
-    const [isLoading, setIsLoading] = useState(false);
-    const { isLoggedIn, storeLogin, storeLogout } = useAuthStore();
     const navigate = useNavigate();
+    const { userLogin } = useAuth();
+
+    // react-hook-form 사용
+    const {
+        register,
+        handleSubmit,
+        setError,
+        formState: { errors, isSubmitting }
+    } = useForm<LoginProps>();
+
+    const onSubmit = async (data: LoginProps) => {
+        try {
+            await userLogin(data);
+            navigate("/");
+        } catch (error: any) {
+            setError("root",
+                {
+                    type: "manual",
+                    message: error.response?.data?.message || "로그인에 실패했습니다"
+                }
+            );
+        };
+    };
 
     // 이메일 로그인
-    const handleLogin = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setIsLoading(true);
-        setError(null);
+    // const handleLogin = async (e: React.FormEvent) => {
+    //     e.preventDefault();
+    //     setIsLoading(true);
+    //     setError(null);
 
-        login({ email, password })
-            .then((res) => {
-                // storeLogin(res.token, res.user.username);
-                storeLogin(res.user.username);
-                navigate("/");
-            })
-            .catch((error) => {
-                setError(error.response?.data?.message || "로그인에 실패했습니다");
-            })
-            .finally(() => {
-                setIsLoading(false);
-            });
+    //     login({ email, password })
+    //         .then((res) => {
+    //             // storeLogin(res.token, res.user.username);
+    //             storeLogin(res.user.username);
+    //             navigate("/");
+    //         })
+    //         .catch((error) => {
+    //             setError(error.response?.data?.message || "로그인에 실패했습니다");
+    //         })
+    //         .finally(() => {
+    //             setIsLoading(false);
+    //         });
 
-        // try {
-        //     const res = await apiClient.post('/auth/login', { email, password });
-        //     storeLogin(res.data.token);
-        //     navigate("/");
-        // } catch (error: any) {
-        //     const message = error.response?.data?.message || "로그인에 실패했습니다";
-        //     setError(message);
-        // } finally {
-        //     setIsLoading(false);
-        // }
-    }
+    //     // try {
+    //     //     const res = await apiClient.post('/auth/login', { email, password });
+    //     //     storeLogin(res.data.token);
+    //     //     navigate("/");
+    //     // } catch (error: any) {
+    //     //     const message = error.response?.data?.message || "로그인에 실패했습니다";
+    //     //     setError(message);
+    //     // } finally {
+    //     //     setIsLoading(false);
+    //     // }
+    // }
 
     // 구글 로그인
     const handleGoogleLogin = async () => {
         // const supabase = createClient()
-        setIsLoading(true)
-        setError(null)
+        // setIsLoading(true)
+        // setError(null)
 
         try {
             // const { error } = await supabase.auth.signInWithOAuth({
@@ -66,10 +86,11 @@ const Login = () => {
             // })
             // if (error) throw error
         } catch (error: unknown) {
-            setError(error instanceof Error ? error.message : "Google 로그인에 실패했습니다");
-            setIsLoading(false);
+            // setError(error instanceof Error ? error.message : "Google 로그인에 실패했습니다");
+            // setIsLoading(false);
         }
     }
+
     return (
         <div className="flex min-h-full w-full items-center justify-center p-6">
             <div className="w-full max-w-sm">
@@ -80,18 +101,32 @@ const Login = () => {
                             <CardDescription>이메일과 비밀번호를 입력하여 로그인하세요</CardDescription>
                         </CardHeader>
                         <CardContent>
-                            <form onSubmit={handleLogin}>
+                            <form onSubmit={handleSubmit(onSubmit)}>
                                 <div className="flex flex-col gap-6">
                                     <div className="grid gap-2">
                                         <Label htmlFor="email">이메일</Label>
                                         <Input
+                                            {...register("email",
+                                                {
+                                                    required: { value: true, message: "이메일을 입력해주세요" },
+                                                    pattern: {
+                                                        value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                                                        message: "이메일 형식이 올바르지 않습니다"
+                                                    }
+                                                }
+                                            )}
+                                            type="email"
+                                            placeholder="example@email.com"
+                                        />
+                                        {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
+                                        {/* <Input
                                             id="email"
                                             type="email"
                                             placeholder="example@email.com"
                                             required
                                             value={email}
                                             onChange={(e) => setEmail(e.target.value)}
-                                        />
+                                        /> */}
                                     </div>
                                     <div className="grid gap-2">
                                         <div className="flex items-center justify-between">
@@ -101,16 +136,25 @@ const Login = () => {
                                             </Link>
                                         </div>
                                         <Input
+                                            {...register("password",
+                                                {
+                                                    required: { value: true, message: "비밀번호를 입력해주세요" }
+                                                }
+                                            )}
+                                            type="password"
+                                        />
+                                        {errors.password && <p className="text-sm text-destructive">{errors.password.message}</p>}
+                                        {/* <Input
                                             id="password"
                                             type="password"
                                             required
                                             value={password}
                                             onChange={(e) => setPassword(e.target.value)}
-                                        />
+                                        /> */}
                                     </div>
-                                    {error && <p className="text-sm text-destructive">{error}</p>}
-                                    <Button type="submit" className="w-full" disabled={isLoading}>
-                                        {isLoading ? "로그인 중..." : "로그인"}
+                                    {errors.root && <p className="text-sm text-destructive">{errors.root.message}</p>}
+                                    <Button type="submit" className="w-full" disabled={isSubmitting}>
+                                        {isSubmitting ? "로그인 중..." : "로그인"}
                                     </Button>
 
                                     <div className="relative">
@@ -127,7 +171,7 @@ const Login = () => {
                                         variant="outline"
                                         className="w-full bg-transparent"
                                         onClick={handleGoogleLogin}
-                                        disabled={isLoading}
+                                    // disabled={isLoading}
                                     >
                                         <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
                                             <path

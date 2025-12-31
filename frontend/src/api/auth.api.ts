@@ -1,4 +1,5 @@
 import { apiClient } from "@/api/client";
+import type { LoginProps } from "@/pages/auth/Login";
 import type { SignupProps } from "@/pages/auth/Signup";
 
 // 회원가입
@@ -22,7 +23,7 @@ interface LoginResponse {
 }
 
 // 로그인
-export const login = async (data: Omit<SignupProps, 'username'>) => {
+export const login = async (data: LoginProps) => {
     const response = await apiClient.post<LoginResponse>(`/auth/login`, data);
     return response.data;
 }

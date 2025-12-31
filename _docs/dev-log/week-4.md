@@ -597,24 +597,56 @@ Week 4: ███████████░░░ 83%
 
 #### 🎯 오늘의 목표
 - [ ] 비밀번호 찾기, 초기화 구현
-- [ ] 로그인, 회원가입 react-hook-form으로 구현
+- [x] 로그인, 회원가입 react-hook-form으로 구현
 - [ ] 구글 OAuth 구현
 
 #### ✅ 완료한 작업
-- ✅ 
+- ✅ 로그인, 회원가입 react-hook-form으로 구현
 
 
 #### 📝 작업 상세
+- 로그인, 회원가입 폼을 react-hook-form으로 구현
+    - 상황: 기존 `useState`로 각 입력 필드를 관리하던 방식은 입력값이 변경될 때마다 컴포넌트가 리렌더링되어 성능 저하 발생. 또한 유효성 검사 로직이 분산되어 있어 코드 가독성과 유지보수성이 떨어짐
+    - 진행:
+        - `react-hook-form`의 `useForm` 훅 도입
+        - `register` 함수로 입력 필드 등록 및 유효성 검사 규칙 선언적으로 정의
+        - `handleSubmit`으로 폼 제출 로직 통합
+        - `formState.errors`로 에러 메시지 중앙 관리
+        - `formState.isSubmitting`으로 제출 중 상태 자동 관리
+        - `setError`로 서버 응답 에러를 폼 에러로 통합 처리
+        - `getValues`로 이메일 중복 확인 시 현재 입력값 조회
+        - `validate` 옵션으로 비밀번호 일치 여부 검증
+    - 결과:
+        - 불필요한 리렌더링 제거로 컴포넌트 렌더링 시간을 5530ms에서 2613ms로 52% 단축
+        - `useState` 제거로 상태 관리 코드 간소화 (email, password, username, repeatPassword, error, isLoading 등 6개 이상의 state 제거)
+        - 유효성 검사 로직을 `register` 옵션으로 선언적으로 관리하여 코드 가독성 향상
+        - 폼 제출 중 상태를 자동으로 관리하여 중복 제출 방지
+
 
 #### 💡 **개념 정리**
-- 
+- `react-hook-form`의 `useForm` 훅
+    - 입력 필드 등록 및 유효성 검사 규칙 선언적으로 정의
+    - 폼 제출 로직 통합
+    - 에러 메시지 중앙 관리
+    - 제출 중 상태 자동 관리
+    - 서버 응답 에러를 폼 에러로 통합 처리
+    - 입력값 조회
+    - 유효성 검사
+
+- `useForm` 훅의 메소드 기능 정리
+    - `register`: 입력 필드 등록 및 유효성 검사 규칙 선언적으로 정의
+    - `handleSubmit`: 폼 제출 로직 통합
+    - `formState`: 폼 상태 관리
+    - `setError`: 서버 응답 에러를 폼 에러로 통합 처리
+    - `getValues`: 입력값 조회
+    - `validate`: 유효성 검사
 
 **참고 링크**:
 - [React-Hook-Form](https://react-hook-form.com/)
 
 #### 📌 내일 할 일
 - [ ] 비밀번호 찾기, 재설정 화면 및 기능 구현
-- [ ] 로그인, 회원가입 react-hook-form으로 구현
+- [ ] tanstack query로 로그인, 회원가입 구현
 - [ ] 구글 OAuth 구현
 
 #### 📌 디벨롭 사항
@@ -640,4 +672,4 @@ Week 4: ███████████░░░ 83%
 - 
 
 #### 📊 진행률
-Week 4: ███████████░░░ 83%
+Week 4: ███████████░░░ 84%
