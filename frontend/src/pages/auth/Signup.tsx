@@ -26,6 +26,7 @@ const Signup = () => {
         register,
         handleSubmit,
         setError,
+        clearErrors,
         getValues,
         formState: { errors, isSubmitting }
     } = useForm<SignupProps>();
@@ -72,6 +73,9 @@ const Signup = () => {
             });
             return;
         }
+
+        // 이메일 형식이 올바르면 react-hook-form 에러 클리어
+        clearErrors("email");
 
         try {
             await userEmailCheck(email);
@@ -137,7 +141,6 @@ const Signup = () => {
                                             >
                                                 {isLoading ? "확인 중..." : "중복확인"}
                                             </Button>
-                                            {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
                                             {/* <Input
                                                 id="email"
                                                 type="email"
@@ -152,7 +155,13 @@ const Signup = () => {
                                             /> */}
                                         </div>
                                     </div>
-                                    {emailError && <p className={`text-sm ${isEmailChecked ? 'text-green-600' : 'text-destructive'}`}>{emailError}</p>}
+                                    {/* errors.email: react-hook-form의 유효성 검사 에러 (필수 입력, 이메일 형식)
+                                    emailError: 이메일 중복 확인 결과 (useAuth에서 관리) */}
+                                    {errors.email ? (
+                                        <p className="text-sm text-destructive">{errors.email.message}</p>
+                                    ) : emailError ? (
+                                        <p className={`text-sm ${isEmailChecked ? 'text-green-600' : 'text-destructive'}`}>{emailError}</p>
+                                    ) : null}
                                     <div className="grid gap-2">
                                         <Label htmlFor="password">비밀번호</Label>
                                         <Input

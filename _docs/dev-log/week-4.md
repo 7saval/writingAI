@@ -614,6 +614,7 @@ Week 4: ███████████░░░ 83%
         - `formState.errors`로 에러 메시지 중앙 관리
         - `formState.isSubmitting`으로 제출 중 상태 자동 관리
         - `setError`로 서버 응답 에러를 폼 에러로 통합 처리
+        - `clearErrors`로 폼 에러 초기화
         - `getValues`로 이메일 중복 확인 시 현재 입력값 조회
         - `validate` 옵션으로 비밀번호 일치 여부 검증
     - 결과:
@@ -638,6 +639,7 @@ Week 4: ███████████░░░ 83%
     - `handleSubmit`: 폼 제출 로직 통합
     - `formState`: 폼 상태 관리
     - `setError`: 서버 응답 에러를 폼 에러로 통합 처리
+    - `clearErrors`: 폼 에러 초기화
     - `getValues`: 입력값 조회
     - `validate`: 유효성 검사
 
@@ -669,7 +671,22 @@ Week 4: ███████████░░░ 83%
 
 
 #### 🚨 이슈/질문
-- 
+- 회원가입 폼 이메일 에러 표시 문제
+    - [문제발생] 
+        - `errors.email`(react-hook-form 유효성 검사 에러)과 `emailError`(이메일 중복 확인 결과)가 동시에 표시되어 두 개의 에러 메시지가 중복으로 나타남
+        - 이메일 중복 확인 버튼을 클릭했을 때 `errors.email`이 남아있어 `emailError`(중복 확인 결과)가 표시되지 않음
+    - [원인] 
+        - 두 에러 메시지를 각각 독립적으로 렌더링하여 조건부 표시 로직이 없었음
+        - 이메일 중복 확인 시 react-hook-form의 `errors.email`을 클리어하지 않아, 삼항 연산자 조건에서 `emailError`가 표시되지 않음
+    - [해결] 
+        - 에러 메시지 표시 로직을 삼항 연산자로 변경: `errors.email`이 있으면 우선 표시하고, 없으면 `emailError` 표시
+        - `useForm`에서 `clearErrors` 함수를 추가로 가져와 이메일 중복 확인 시 이메일 형식이 올바르면 `clearErrors("email")` 호출하여 `errors.email` 제거
+        - 이를 통해 이메일 형식 검증 후 중복 확인 결과가 정상적으로 표시되도록 개선
+    - [결과]
+        - 사용자가 이메일을 입력할 때: 필수 입력 또는 형식 오류 시 `errors.email` 표시
+        - 중복 확인 버튼 클릭 시: 형식이 올바르면 `errors.email` 제거 후 `emailError`(사용 가능/중복) 표시
+        - 에러 메시지가 중복되지 않고 상황에 맞게 하나씩만 표시되어 사용자 경험 개선
+
 
 #### 📊 진행률
 Week 4: ███████████░░░ 84%
