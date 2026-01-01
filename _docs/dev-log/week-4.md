@@ -690,3 +690,186 @@ Week 4: ███████████░░░ 83%
 
 #### 📊 진행률
 Week 4: ███████████░░░ 84%
+---
+### 📅 2025-01-01 (Day 21)
+
+#### 🎯 오늘의 목표
+- [x] tanstack query로 로그인, 회원가입 구현
+
+#### ✅ 완료한 작업
+- ✅ tanstack query로 로그인, 회원가입 구현
+
+
+#### 📝 작업 상세
+- tanstack query 사전 준비
+    - queryClient.ts 생성
+    - App.tsx에 QueryClientProvider 추가
+    ```typescript
+    import { QueryClient } from "@tanstack/react-query";
+
+    export const queryClient = new QueryClient();    
+    ```
+
+    ```typescript
+    import { QueryClientProvider } from "@tanstack/react-query";
+    import { queryClient } from "./lib/queryClient";
+
+    function App() {
+      return (
+        <QueryClientProvider client={queryClient}>
+          <RouterProvider router={router} />
+        </QueryClientProvider>
+      );
+    }
+    ```
+
+- useMutations.ts 파일 생성
+    - useLoginMutation: 로그인 성공 시 자동으로 storeLogin 호출
+    - useSignupMutation: 회원가입 API 호출
+    - useEmailCheckMutation: 이메일 중복 확인 API 호출
+    ```typescript
+    import { useMutation } from "@tanstack/react-query";
+    import { useAuthStore } from "../store/authStore";
+    import { login } from "../api/auth.api";
+    import { LoginProps } from "../types/auth.type";
+    
+    // 로그인 Mutation
+    export const useLoginMutation = () => {
+        const { storeLogin } = useAuthStore();
+        return useMutation({
+            mutationFn: async (data: LoginProps) => {
+                const response = await login(data);
+                return response;
+            },
+            onSuccess: (data) => {
+                // 로그인 성공 시 전역 상태 업데이트
+                storeLogin(data.user.username);
+            },
+        });
+    };
+
+    // 이메일 중복 확인 Mutation
+    export const useEmailCheckMutation = () => {
+        return useMutation({
+            mutationFn: async (email: string) => {
+                const response = await checkEmail({ email });
+                return response;
+            },
+            onSuccess: () => {
+
+            },
+            onError: (error: AxiosError<{ message: string }>) => {
+                console.error(error);
+            }
+        })
+    }
+    ```
+
+- Login.tsx 수정
+    - useLoginMutation 호출
+    ```typescript
+    import { useLoginMutation } from "../hooks/useAuthMutations";
+    
+    const { loginMutation } = useLoginMutation();
+    ```
+    
+    - onSubmit 핸들러 수정
+    ```typescript
+    const onSubmit = async (data: LoginProps) => {
+        try {
+            await loginMutation.mutateAsync(data);
+        } catch (error) {
+            console.error(error);
+        }
+    };
+    ```
+
+    - 버튼 로딩 상태 수정
+    ```typescript
+    // 기존
+    <Button type="submit" className="w-full" disabled={isSubmitting}>
+        {isSubmitting ? "로그인 중..." : "로그인"}
+    </Button>
+    // 변경 후 (선택사항: mutation의 isPending 사용)
+    <Button type="submit" className="w-full" disabled={loginMutation.isPending}>
+        {loginMutation.isPending ? "로그인 중..." : "로그인"}
+    </Button>
+    ```
+
+#### 🚨 이슈/트러블슈팅
+- [문제발생] 이메일 중복 체크 시 에러가 발생할 경우 emailCheckMutation.error?.response?.data?.message 로 에러 메시지를 가져오려고 했으나 typeError가 발생했다.
+    ```bash
+    Property 'response' does not exist on type 'Error'.ts(2339)
+    ```
+- [원인파악]  useMutation의 error 타입 기본값이 Error인데 Error에는 response가 없고 response는 AxiosError에만 존재한다. (즉, Axios 에러(AxiosError)처럼 접근)
+- [해결] error 타입을 AxiosError<{ message: string }>로 지정
+    ```typescript
+        onError: (error: AxiosError<{ message: string }>) => {
+            console.error(error);
+        }
+    ```
+
+
+#### 💡 **개념 정리**
+- TanStack Query의 장점
+    - 자동 상태 관리: isPending, isError, isSuccess 자동 제공
+    - 재시도 로직: 실패 시 자동 재시도 (설정 가능)
+    - 캐싱: 동일한 요청 중복 방지
+    - DevTools: React Query DevTools로 디버깅 용이
+    - 타입 안전성: TypeScript와 완벽한 통합
+    
+- `useQuery` vs `useMutation`
+    - `useQuery`: 
+        - GET 요청
+        - 캐시가 핵심
+        - 자동 재요청(refetch), stale 관리
+    - `useMutation`: 
+        - POST / PUT / PATCH / DELETE
+        - 상태 변경이 핵심
+        - 캐시 자동 X → 직접 캐시 갱신 필요
+
+- `useMutation()` 사용법
+    - mutationFn: API 호출 함수
+    - onSuccess: API 호출 성공 시 실행 함수
+    - onError: API 호출 실패 시 실행 함수
+    - onSettled: API 호출 성공/실패 시 실행 함수
+
+    ※ 상태값
+
+    | 상태          | 의미    |
+    | ----------- | ----- |
+    | `isPending` | 요청 중  |
+    | `isSuccess` | 성공    |
+    | `isError`   | 실패    |
+    | `error`     | 에러 객체 |
+    | `data`      | 성공 응답 |
+
+
+**참고 링크**:
+- [TanStack Query](https://tanstack.com/query/latest)
+
+#### 📌 내일 할 일
+- [ ] 비밀번호 찾기, 재설정 화면 및 기능 구현
+- [ ] 구글 OAuth 구현
+
+#### 📌 디벨롭 사항
+- [ ] 글쓰기 애니메이션
+- [ ] 사용자정의 프롬프트 구현 
+- [ ] 사용자 인증 시스템 구현
+- [ ] 백엔드 에러 핸들링 개선
+- [ ] 작성 글 내보내기
+- [ ] 배포하기
+
+
+#### 📝 피드백 내용
+- 글쓰기 애니메이션
+    - 스트림 형식 / 잘라서 눈속임
+
+- database.ts
+    - 타입 형식 : 카멜 - 스네이크 맞추기
+
+- ai 생성 시 스크롤 맨 밑으로 이동하도록 구현
+
+
+#### 📊 진행률
+Week 4: ███████████░░░ 85%

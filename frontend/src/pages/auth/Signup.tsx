@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/useAuth";
+import { useSignupMutation, useEmailCheckMutation } from "@/hooks/useAuthMutations";
 import { useForm } from "react-hook-form";
 import { Link, useNavigate } from "react-router-dom";
 
@@ -15,11 +16,13 @@ export interface SignupProps {
 
 const Signup = () => {
     const navigate = useNavigate();
-    const { userSignup,
-        userEmailCheck,
-        emailError,
-        isEmailChecked,
-        isLoading } = useAuth();
+    // const { userSignup,
+    //     userEmailCheck,
+    //     emailError,
+    //     isEmailChecked,
+    //     isLoading } = useAuth();
+    const signupMutation = useSignupMutation();
+    const emailCheckMutation = useEmailCheckMutation();
 
     // react-hook-form 사용
     const {
@@ -33,13 +36,14 @@ const Signup = () => {
 
     const onSubmit = async (data: SignupProps) => {
         // 이메일 중복 확인 여부 체크
-        if (!isEmailChecked) {
+        if (!emailCheckMutation.isSuccess) {
             alert("이메일 중복 확인을 해주세요.");
             return;
         }
 
         try {
-            await userSignup(data);
+            // await userSignup(data);
+            await signupMutation.mutateAsync(data);
             alert("회원가입이 완료되었습니다.");
             navigate('/login');
         } catch (error: any) {
@@ -78,9 +82,10 @@ const Signup = () => {
         clearErrors("email");
 
         try {
-            await userEmailCheck(email);
+            // await userEmailCheck(email);
+            await emailCheckMutation.mutateAsync(email)
         } catch (error) {
-            // 에러는 useAuth에서 이미 처리됨
+            // 에러는 mutation에서 자동으로 처리됨
         }
     }
 
@@ -137,9 +142,9 @@ const Signup = () => {
                                                 variant="outline"
                                                 size="sm"
                                                 onClick={handleCheckEmail}
-                                                disabled={isLoading}
+                                                disabled={emailCheckMutation.isPending}
                                             >
-                                                {isLoading ? "확인 중..." : "중복확인"}
+                                                {emailCheckMutation.isPending ? "확인 중..." : "중복확인"}
                                             </Button>
                                             {/* <Input
                                                 id="email"
@@ -156,11 +161,17 @@ const Signup = () => {
                                         </div>
                                     </div>
                                     {/* errors.email: react-hook-form의 유효성 검사 에러 (필수 입력, 이메일 형식)
-                                    emailError: 이메일 중복 확인 결과 (useAuth에서 관리) */}
+                                    emailCheckMutation: 이메일 중복 확인 결과 (TanStack Query에서 관리) */}
                                     {errors.email ? (
                                         <p className="text-sm text-destructive">{errors.email.message}</p>
-                                    ) : emailError ? (
-                                        <p className={`text-sm ${isEmailChecked ? 'text-green-600' : 'text-destructive'}`}>{emailError}</p>
+                                    ) : emailCheckMutation.isError ? (
+                                        <p className="text-sm text-destructive">
+                                            {emailCheckMutation.error?.response?.data?.message || "이미 사용 중인 이메일입니다."}
+                                        </p>
+                                    ) : emailCheckMutation.isSuccess ? (
+                                        <p className="text-sm text-green-600">
+                                            {emailCheckMutation.data?.message || "사용 가능한 이메일입니다."}
+                                        </p>
                                     ) : null}
                                     <div className="grid gap-2">
                                         <Label htmlFor="password">비밀번호</Label>
@@ -210,8 +221,8 @@ const Signup = () => {
                                         /> */}
                                     </div>
                                     {errors.root && <p className="text-sm text-destructive">{errors.root.message}</p>}
-                                    <Button type="submit" className="w-full" disabled={isSubmitting}>
-                                        {isSubmitting ? "계정 생성 중..." : "회원가입"}
+                                    <Button type="submit" className="w-full" disabled={signupMutation.isPending}>
+                                        {signupMutation.isPending ? "계정 생성 중..." : "회원가입"}
                                     </Button>
                                 </div>
                                 <div className="mt-4 text-center text-sm">

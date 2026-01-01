@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/useAuth";
+import { useLoginMutation } from "@/hooks/useAuthMutations";
 import { useAuthStore } from "@/store/authStore";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -16,7 +17,8 @@ export interface LoginProps {
 
 const Login = () => {
     const navigate = useNavigate();
-    const { userLogin } = useAuth();
+    // const { userLogin } = useAuth();
+    const loginMutation = useLoginMutation();
 
     // react-hook-form 사용
     const {
@@ -28,7 +30,8 @@ const Login = () => {
 
     const onSubmit = async (data: LoginProps) => {
         try {
-            await userLogin(data);
+            // await userLogin(data);
+            await loginMutation.mutateAsync(data);
             navigate("/");
         } catch (error: any) {
             setError("root",
@@ -153,8 +156,8 @@ const Login = () => {
                                         /> */}
                                     </div>
                                     {errors.root && <p className="text-sm text-destructive">{errors.root.message}</p>}
-                                    <Button type="submit" className="w-full" disabled={isSubmitting}>
-                                        {isSubmitting ? "로그인 중..." : "로그인"}
+                                    <Button type="submit" className="w-full" disabled={loginMutation.isPending}>
+                                        {loginMutation.isPending ? "로그인 중..." : "로그인"}
                                     </Button>
 
                                     <div className="relative">

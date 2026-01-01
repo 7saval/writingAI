@@ -6,6 +6,8 @@ import Error from './components/common/Error';
 import { useEffect } from 'react';
 import { verifyUser } from './api/auth.api';
 import { useAuthStore } from './store/authStore';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { queryClient } from './lib/queryClient';
 
 const router = createBrowserRouter(routeList.map((item) => {
   return {
@@ -34,9 +36,9 @@ function App() {
   }, []);
 
   return (
-    <>
+    <QueryClientProvider client={queryClient}>
       <RouterProvider router={router} />
-    </>
+    </QueryClientProvider>
   )
 }
 
