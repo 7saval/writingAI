@@ -107,3 +107,110 @@ export default ProtectedRoute;
 Week 5: ███████████░░░ 85%
 
 ---
+### 📅 2026-01-03 (Day 23)
+
+#### 🎯 오늘의 목표
+- [x] 사용자 인증 API(verify-user) tanstack query로 구현
+- [ ] 비밀번호 찾기, 재설정 화면 및 기능 구현
+- [ ] 구글 OAuth 구현
+
+#### ✅ 완료한 작업
+- ✅ 사용자 인증 API(verify-user) tanstack query로 구현
+
+
+#### 📝 작업 상세
+- **`useEffect` 기반 인증 로직을 TanStack Query(`useQuery`)로 전환**
+    - `App.tsx`와 `ProtectedRoute.tsx`에 흩어져 있던 인증 확인 로직을 `useAuthQuery` 커스텀 훅으로 단일화
+    - `staleTime` 설정을 통해 5분간 캐싱을 유지하여 불필요한 API 호출 방지
+    - 서버 상태 관리의 선언적 코딩 패턴 도입
+
+```typescript
+// [변경 전] App.tsx / ProtectedRoute.tsx에서 개별적으로 useEffect 사용
+useEffect(() => {
+    const checkAuth = async () => {
+        try {
+            const response = await verifyUser();
+            if (response.authenticated) {
+                useAuthStore.setState({ isLoggedIn: true, username: response.user.username });
+            }
+        } catch (error) { /* Silent Check */ }
+    };
+    checkAuth();
+}, []);
+
+// [변경 후] useAuthQuery 커스텀 훅으로 캡슐화 및 간소화
+// hooks/useAuthQuery.ts
+export const useAuthQuery = () => {
+    const { storeLogin, storeLogout } = useAuthStore();
+    return useQuery({
+        queryKey: ["authUser"],
+        queryFn: async () => {
+            try {
+                const response = await verifyUser();
+                if (response.authenticated) {
+                    storeLogin(response.user.username);
+                    return response;
+                }
+                storeLogout();
+                return null;
+            } catch (error) {
+                storeLogout();
+                return null;
+            }
+        },
+        staleTime: 1000 * 60 * 5, // 5분 캐싱
+    });
+};
+
+// App.tsx
+function App() {
+    useAuthQuery(); // 한 줄로 인증 상태 확인 및 전역 스토어 동기화 완료
+    // ...
+}
+```
+
+
+#### 🚨 이슈/트러블슈팅
+- **이슈**: `useAuthQuery`를 사용하는 `App` 컴포넌트 내부에서 `QueryClientProvider`를 선언하여 `No QueryClient set` 에러 발생
+- **해결**: `QueryClientProvider`를 `main.tsx`로 이동시켜 `App` 컴포넌트 상위에서 Context를 제공하도록 구조 변경
+
+
+#### 💡 **개념 정리**
+- **useQuery**: 
+    - queryKey : 캐시(데이터)를 구분하는 키
+    - queryFn : 캐시(데이터)를 가져오거나 업데이트하는 함수
+    - staleTime : 캐시(데이터)의 유효기간
+    - 로딩(isLoading), 데이터(data), 에러(error) 상태는 TanStack Query가 알아서 관리
+- **Server State vs Client State**: API를 통해 가져오는 인증 정보는 서버 상태이며, 이를 TanStack Query로 관리함으로써 캐싱, 동기화, 로딩 상태 처리를 자동화할 수 있음.
+- **Declarative Programming**: "어떻게(How)" 로직을 수행할지 명령하는 대신 "무엇(What)"이 필요한지 선언하여 코드의 가독성과 유지보수성을 높임.
+
+**참고 링크**:
+- 
+
+#### 📌 내일 할 일
+- [ ] 비밀번호 찾기, 재설정 화면 및 기능 구현
+- [ ] 구글 OAuth 구현
+
+#### 📌 디벨롭 사항
+- [ ] 글쓰기 애니메이션
+- [ ] 사용자정의 프롬프트 구현 
+- [ ] 사용자 인증 시스템 구현
+- [ ] 백엔드 에러 핸들링 개선
+- [ ] 작성 글 내보내기
+- [ ] 배포하기
+
+
+#### 📝 피드백 내용
+- 글쓰기 애니메이션
+    - 스트림 형식 / 잘라서 눈속임
+
+- database.ts
+    - 타입 형식 : 카멜 - 스네이크 맞추기
+
+- ai 생성 시 스크롤 맨 밑으로 이동하도록 구현
+
+
+#### 📊 진행률
+Week 5: ███████████░░░ 85%
+
+---
