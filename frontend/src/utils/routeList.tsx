@@ -1,9 +1,9 @@
-
 import ForgotPassword from "@/pages/auth/ForgotPassword";
 import Login from "@/pages/auth/Login";
 import Signup from "@/pages/auth/Signup";
 import Home from "@/pages/Home";
 import WritingSession from "@/pages/WritingSession";
+import ProtectedRoute from "@/components/auth/ProtectedRoute";
 
 export const routeList = [
     {
@@ -24,10 +24,18 @@ export const routeList = [
     },
     {
         path: "/projects",
-        element: <WritingSession />
+        element: (
+            <ProtectedRoute>
+                <WritingSession />
+            </ProtectedRoute>
+        )
     },
     {
         path: "/projects/:projectId/paragraphs",
-        element: <WritingSession />
+        element: (
+            <ProtectedRoute>
+                <WritingSession />
+            </ProtectedRoute>
+        )
     }
 ]

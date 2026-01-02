@@ -90,7 +90,8 @@ export async function logout(req: Request, res: Response, next: NextFunction) {
 export async function verifyUser(req: Request, res: Response, next: NextFunction) {
     try {
         const token = req.cookies?.token;
-        if (!token) return res.status(StatusCodes.UNAUTHORIZED).json({
+        if (!token) return res.status(StatusCodes.OK).json({
+            authenticated: false,
             message: '인증되지 않은 사용자입니다.'
         });
 
@@ -98,10 +99,12 @@ export async function verifyUser(req: Request, res: Response, next: NextFunction
             const decoded = jwt.verify(token, process.env.JWT_SECRET!) as jwt.JwtPayload;
             const repo = AppDataSource.getRepository(User);
             const user = await repo.findOneBy({ id: decoded.id });
-            if (!user) return res.status(StatusCodes.UNAUTHORIZED).json({
+            if (!user) return res.status(StatusCodes.OK).json({
+                authenticated: false,
                 message: '인증되지 않은 사용자입니다.'
             });
             res.status(StatusCodes.OK).json({
+                authenticated: true,
                 message: '인증이 완료되었습니다.',
                 user: {
                     username: user.username,
@@ -109,7 +112,8 @@ export async function verifyUser(req: Request, res: Response, next: NextFunction
                 }
             });
         } catch (error) {
-            res.status(StatusCodes.UNAUTHORIZED).json({
+            res.status(StatusCodes.OK).json({
+                authenticated: false,
                 message: '세션이 만료되었습니다.'
             });
         }

@@ -1,14 +1,12 @@
-import { login } from "@/api/auth.api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useAuth } from "@/hooks/useAuth";
 import { useLoginMutation } from "@/hooks/useAuthMutations";
-import { useAuthStore } from "@/store/authStore";
-import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
+import { useEffect } from "react";
 
 export interface LoginProps {
     email: string;
@@ -17,15 +15,28 @@ export interface LoginProps {
 
 const Login = () => {
     const navigate = useNavigate();
-    // const { userLogin } = useAuth();
+    const location = useLocation();
+    const { toast } = useToast();
     const loginMutation = useLoginMutation();
+
+    useEffect(() => {
+        const message = location.state?.message;
+        if (message) {
+            toast({
+                title: "알림",
+                description: message,
+            });
+            // 메시지를 한 번 보여준 후 state를 비워서 새로고침 시 다시 뜨지 않게 함
+            navigate(location.pathname, { replace: true, state: {} });
+        }
+    }, [location, toast, navigate]);
 
     // react-hook-form 사용
     const {
         register,
         handleSubmit,
         setError,
-        formState: { errors, isSubmitting }
+        formState: { errors }
     } = useForm<LoginProps>();
 
     const onSubmit = async (data: LoginProps) => {

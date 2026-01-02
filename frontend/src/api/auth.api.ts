@@ -35,6 +35,7 @@ export const logout = async () => {
 }
 
 interface VerifyUserResponse {
+    authenticated: boolean;
     message: string;
     user: {
         username: string;
