@@ -30,8 +30,8 @@ export class Project {
     updatedAt?: Date;
 
     @ManyToOne(() => User, (user) => user.projects,
-        { onDelete: 'CASCADE', nullable: true })
-    @JoinColumn({ name: 'user_id', referencedColumnName: 'id' })  // 조인컬럼 설정(생략 가능)
+        { onDelete: 'CASCADE', nullable: false })
+    @JoinColumn({ name: 'userId', referencedColumnName: 'id' })  // 조인컬럼 설정(생략 가능)
     user!: User;
 
     @OneToMany(() => Paragraph, (paragraph) => paragraph.project, { cascade: true })   // OneToMany 연결

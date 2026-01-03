@@ -23,6 +23,6 @@ export class Paragraph {
 
     @ManyToOne(() => Project, (project) => project.paragraphs,
         { onDelete: 'CASCADE', nullable: false })
-    @JoinColumn({ name: 'project_id', referencedColumnName: 'id' })  // 조인컬럼 설정(생략 가능)
+    @JoinColumn({ name: 'projectId', referencedColumnName: 'id' })  // 조인컬럼 설정(생략 가능)
     project!: Project;
 }

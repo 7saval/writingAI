@@ -3,6 +3,7 @@ import { AppDataSource } from "../data-source";
 import { Project } from "../entity/Projects";
 import { StatusCodes } from "http-status-codes";
 import { Paragraph } from "../entity/Paragraphs";
+import jwt from 'jsonwebtoken';
 
 // 프로젝트 생성
 export async function createProject(req: Request, res: Response, next: NextFunction) {
@@ -25,8 +26,13 @@ export async function createProject(req: Request, res: Response, next: NextFunct
 // 프로젝트 목록 조회
 export async function getProjects(req: Request, res: Response, next: NextFunction) {
     try {
+        const userId = req.user!.id;
+
         const repo = AppDataSource.getRepository(Project);
         const list = await repo.find({
+            where: {
+                user: { id: userId }
+            },
             order: {
                 createdAt: 'DESC'
             }   // 최신순 정렬

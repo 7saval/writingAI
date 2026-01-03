@@ -44,6 +44,12 @@ export async function login(req: Request, res: Response, next: NextFunction) {
         });
 
         // 비밀번호 일치 여부
+        if (!user.password) {
+            return res.status(StatusCodes.UNAUTHORIZED).json({
+                message: '이메일 또는 비밀번호가 일치하지 않습니다.'
+            });
+        }
+
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) return res.status(StatusCodes.UNAUTHORIZED).json({
             message: '이메일 또는 비밀번호가 일치하지 않습니다.'
@@ -89,34 +95,23 @@ export async function logout(req: Request, res: Response, next: NextFunction) {
 // 사용자 인증
 export async function verifyUser(req: Request, res: Response, next: NextFunction) {
     try {
-        const token = req.cookies?.token;
-        if (!token) return res.status(StatusCodes.OK).json({
-            authenticated: false,
-            message: '인증되지 않은 사용자입니다.'
-        });
+        const repo = AppDataSource.getRepository(User);
+        const user = await repo.findOneBy({ id: req.user!.id });
 
-        try {
-            const decoded = jwt.verify(token, process.env.JWT_SECRET!) as jwt.JwtPayload;
-            const repo = AppDataSource.getRepository(User);
-            const user = await repo.findOneBy({ id: decoded.id });
-            if (!user) return res.status(StatusCodes.OK).json({
-                authenticated: false,
-                message: '인증되지 않은 사용자입니다.'
-            });
-            res.status(StatusCodes.OK).json({
-                authenticated: true,
-                message: '인증이 완료되었습니다.',
-                user: {
-                    username: user.username,
-                    email: user.email
-                }
-            });
-        } catch (error) {
-            res.status(StatusCodes.OK).json({
-                authenticated: false,
-                message: '세션이 만료되었습니다.'
+        if (!user) {
+            return res.status(StatusCodes.UNAUTHORIZED).json({
+                message: '사용자를 찾을 수 없습니다.'
             });
         }
+
+        res.status(StatusCodes.OK).json({
+            authenticated: true,
+            message: '인증이 완료되었습니다.',
+            user: {
+                username: user.username,
+                email: user.email
+            }
+        });
 
     } catch (error) {
         next(error);
@@ -218,6 +213,101 @@ export async function checkEmail(req: Request, res: Response, next: NextFunction
             message: '사용 가능한 이메일입니다.'
         });
     } catch (error) {
+        next(error);
+    }
+}
+
+import { SocialAccount } from "../entity/SocialAccounts";
+
+// 구글 로그인
+export async function googleLogin(req: Request, res: Response, next: NextFunction) {
+    try {
+        const { token } = req.body; // Client sends Access Token
+
+        // Access Token으로 유저 정보 조회
+        const googleResponse = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+            headers: { Authorization: `Bearer ${token}` }
+        });
+
+        if (!googleResponse.ok) {
+            return res.status(StatusCodes.UNAUTHORIZED).json({
+                message: '유효하지 않은 토큰입니다.'
+            });
+        }
+
+        const payload = await googleResponse.json();
+        const { sub: socialId, email, name } = payload;
+
+        if (!email) {
+            return res.status(StatusCodes.BAD_REQUEST).json({
+                message: '이메일 정보가 없습니다.'
+            });
+        }
+
+        const socialRepo = AppDataSource.getRepository(SocialAccount);
+        const userRepo = AppDataSource.getRepository(User);
+
+        // 1. 소셜 계정 조회
+        let socialAccount = await socialRepo.findOne({
+            where: { provider: 'google', socialId },
+            relations: ['user']
+        });
+
+        let user: User;
+
+        if (socialAccount) {
+            // 이미 연동된 계정 -> 로그인 처리
+            user = socialAccount.user;
+        } else {
+            // 연동 안된 경우
+            // 이메일로 기존 유저 확인
+            const existingUser = await userRepo.findOneBy({ email });
+
+            if (existingUser) {
+                // 기존 유저 존재 -> 소셜 계정 연동
+                user = existingUser;
+            } else {
+                // 신규 유저 생성
+                user = userRepo.create({
+                    email,
+                    username: name || 'User',
+                    password: undefined // 소셜 유저는 비밀번호 없음
+                });
+                await userRepo.save(user);
+            }
+
+            // 소셜 계정 생성 및 연결
+            socialAccount = socialRepo.create({
+                provider: 'google',
+                socialId,
+                user
+            });
+            await socialRepo.save(socialAccount);
+        }
+
+        // 로그인 처리
+        const jwtToken = jwt.sign({
+            id: user.id,
+            email: user.email
+        }, process.env.JWT_SECRET!, {
+            expiresIn: process.env.JWT_EXPIRES_IN as any
+        });
+
+        res.cookie("token", jwtToken, {
+            httpOnly: true
+        });
+
+        res.status(StatusCodes.OK).json({
+            message: '구글 로그인이 완료되었습니다.',
+            token: jwtToken,
+            user: {
+                username: user.username,
+                email: user.email
+            }
+        });
+
+    } catch (error) {
+        console.error("Google Login Error:", error);
         next(error);
     }
 }

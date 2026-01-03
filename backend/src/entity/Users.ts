@@ -1,5 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, OneToMany } from "typeorm";
 import { Project } from "./Projects";
+import { SocialAccount } from "./SocialAccounts";
 
 
 @Entity('users')   // 이 클래스가 DB 테이블임을 명시
@@ -10,8 +11,8 @@ export class User {
     @Column({ unique: true, nullable: false })   // nullable 디폴트 옵션은 false
     email!: string;
 
-    @Column()   // 일반 컬럼
-    password!: string;
+    @Column({ nullable: true })   // 일반 컬럼
+    password?: string;
 
     @Column()
     username!: string;
@@ -28,22 +29,6 @@ export class User {
     @OneToMany(() => Project, (project) => project.user)
     projects!: Project[];
 
-    // 생성자
-    // strictPropertyInitialization 옵션이 true일 때, 
-    // 클래스의 모든 필드가 반드시 초기화되어야 한다
-    // constructor(
-    //     id: number,
-    //     email: string,
-    //     password: string,
-    //     username: string,
-    //     createdAt: Date,
-    //     projects: Project[]
-    // ) {
-    //     this.id = id;
-    //     this.email = email;
-    //     this.password = password;
-    //     this.username = username;
-    //     this.createdAt = createdAt;
-    //     this.projects = projects;
-    // }
+    @OneToMany(() => SocialAccount, (socialAccount) => socialAccount.user)
+    socialAccounts!: SocialAccount[];
 }

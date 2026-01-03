@@ -2,11 +2,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useLoginMutation } from "@/hooks/useAuthMutations";
+import { useLoginMutation, useGoogleLoginMutation } from "@/hooks/useAuthMutations";
 import { useForm } from "react-hook-form";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useToast } from "@/hooks/useToast";
 import { useEffect, useRef } from "react";
+import { useGoogleLogin } from "@react-oauth/google";
 
 export interface LoginProps {
     email: string;
@@ -89,24 +90,21 @@ const Login = () => {
     // }
 
     // 구글 로그인
-    const handleGoogleLogin = async () => {
-        // const supabase = createClient()
-        // setIsLoading(true)
-        // setError(null)
+    const googleLoginMutation = useGoogleLoginMutation();
 
-        try {
-            // const { error } = await supabase.auth.signInWithOAuth({
-            //     provider: "google",
-            //     options: {
-            //     redirectTo: `${window.location.origin}/editor`,
-            //     },
-            // })
-            // if (error) throw error
-        } catch (error: unknown) {
-            // setError(error instanceof Error ? error.message : "Google 로그인에 실패했습니다");
-            // setIsLoading(false);
+    const handleGoogleLogin = useGoogleLogin({
+        onSuccess: async (response) => {
+            try {
+                await googleLoginMutation.mutateAsync(response.access_token);
+                navigate("/");
+            } catch (error) {
+                console.error(error);
+            }
+        },
+        onError: () => {
+            setError("root", { type: "manual", message: "Google 로그인에 실패했습니다." });
         }
-    }
+    });
 
     return (
         <div className="flex min-h-full w-full items-center justify-center p-6">
@@ -187,8 +185,8 @@ const Login = () => {
                                         type="button"
                                         variant="outline"
                                         className="w-full bg-transparent"
-                                        onClick={handleGoogleLogin}
-                                    // disabled={isLoading}
+                                        onClick={() => handleGoogleLogin()}
+                                        disabled={googleLoginMutation.isPending}
                                     >
                                         <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
                                             <path

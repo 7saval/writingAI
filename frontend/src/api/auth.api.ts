@@ -60,3 +60,9 @@ export const resetPassword = async (data: { email: string; code: string; newPass
     const response = await apiClient.post(`/auth/reset-password`, data);
     return response.data;
 }
+
+// 구글 로그인
+export const googleLogin = async (token: string) => {
+    const response = await apiClient.post<LoginResponse>(`/auth/google`, { token });
+    return response.data;
+}

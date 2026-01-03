@@ -112,11 +112,12 @@ Week 5: ███████████░░░ 85%
 #### 🎯 오늘의 목표
 - [x] 사용자 인증 API(verify-user) tanstack query로 구현
 - [x] 비밀번호 찾기, 재설정 화면 및 기능 구현
-- [ ] 구글 OAuth 구현
+- [x] 구글 OAuth 구현
 
 #### ✅ 완료한 작업
 - ✅ 사용자 인증 API(verify-user) tanstack query로 구현
 - ✅ 비밀번호 찾기, 재설정 화면 및 기능 구현
+- ✅ 구글 OAuth 구현
 
 
 #### 📝 작업 상세
@@ -225,6 +226,188 @@ const onSubmit = async (values: FormValues) => {
 };
 ```
 
+- **Google OAuth 구현**
+    
+    **1) Google API Console 설정**
+    - [Google API Console](https://console.cloud.google.com/apis/dashboard)에서 OAuth 2.0 클라이언트 ID 생성
+    - 승인된 JavaScript 원본 및 리디렉션 URI 설정
+    - 클라이언트 ID를 프론트엔드 `.env` 파일에 저장
+    
+    **2) 데이터베이스 스키마 설계 (확장 가능한 구조)**
+    - `SocialAccount` 엔티티 생성: 향후 다양한 소셜 로그인(카카오, 네이버 등)을 지원하기 위한 확장 가능한 구조
+    - `Users` 엔티티와 1:N 관계 설정 (한 유저가 여러 소셜 계정 연동 가능)
+    
+    ```typescript
+    // SocialAccounts.ts
+    @Entity('social_accounts')
+    export class SocialAccount {
+        @PrimaryGeneratedColumn()
+        id!: number;
+    
+        @Column()
+        provider!: string; // 'google', 'kakao', 'naver' 등
+    
+        @Column()
+        socialId!: string; // 소셜 플랫폼에서 제공하는 고유 ID
+    
+        @ManyToOne(() => User, (user) => user.socialAccounts, { onDelete: 'CASCADE' })
+        @JoinColumn({ name: 'userId' })
+        user!: User;
+    
+        @Column()
+        userId!: number;
+    
+        @CreateDateColumn()
+        connectedAt!: Date;
+    }
+    ```
+    
+    **3) 백엔드 구현**
+    - **Access Token 검증**: 클라이언트로부터 받은 Google Access Token을 Google API로 검증
+    - **사용자 정보 조회**: 검증된 토큰으로 사용자 이메일 및 프로필 정보 획득
+    - **계정 연동 로직**:
+        - 이미 연동된 소셜 계정이 있으면 → 기존 유저로 로그인
+        - 연동 안 된 경우:
+            - 같은 이메일의 기존 유저가 있으면 → 소셜 계정 연동
+            - 신규 유저면 → 새 유저 생성 + 소셜 계정 연결
+    - **JWT 토큰 발급**: 로그인 성공 시 JWT 생성 및 쿠키에 저장
+    
+    ```typescript
+    // authController.ts - googleLogin 함수 (핵심 로직)
+    export async function googleLogin(req: Request, res: Response, next: NextFunction) {
+        const { token } = req.body;
+        
+        // 1. Google API로 Access Token 검증 및 사용자 정보 조회
+        const googleResponse = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+            headers: { Authorization: `Bearer ${token}` }
+        });
+        const payload = await googleResponse.json();
+        const { sub: socialId, email, name } = payload;
+        
+        // 2. 소셜 계정 조회
+        let socialAccount = await socialRepo.findOne({
+            where: { provider: 'google', socialId },
+            relations: ['user']
+        });
+        
+        let user: User;
+        
+        if (socialAccount) {
+            // 이미 연동된 계정 → 로그인
+            user = socialAccount.user;
+        } else {
+            // 연동 안된 경우
+            const existingUser = await userRepo.findOneBy({ email });
+            
+            if (existingUser) {
+                // 기존 유저 존재 → 소셜 계정 연동
+                user = existingUser;
+            } else {
+                // 신규 유저 생성
+                user = userRepo.create({
+                    email,
+                    username: name || 'User',
+                    password: undefined // 소셜 로그인 유저는 비밀번호 없음
+                });
+                await userRepo.save(user);
+            }
+            
+            // 소셜 계정 생성 및 연결
+            socialAccount = socialRepo.create({
+                provider: 'google',
+                socialId,
+                user
+            });
+            await socialRepo.save(socialAccount);
+        }
+        
+        // 3. JWT 토큰 발급 및 쿠키 저장
+        const jwtToken = jwt.sign({ id: user.id, email: user.email }, 
+            process.env.JWT_SECRET!, 
+            { expiresIn: process.env.JWT_EXPIRES_IN }
+        );
+        
+        res.cookie("token", jwtToken, { httpOnly: true });
+        res.status(StatusCodes.OK).json({
+            message: '구글 로그인이 완료되었습니다.',
+            token: jwtToken,
+            user: { username: user.username, email: user.email }
+        });
+    }
+    ```
+    
+    **4) 프론트엔드 구현**
+    - **라이브러리**: `@react-oauth/google` 사용
+    - **GoogleOAuthProvider**: `main.tsx`에서 앱 전체를 감싸서 Google OAuth 컨텍스트 제공
+    - **useGoogleLogin 훅**: 구글 로그인 플로우 처리
+        - `onSuccess`: Access Token을 백엔드로 전송하여 인증 처리
+        - `onError`: 에러 핸들링
+    - **TanStack Query**: `useGoogleLoginMutation` 훅으로 API 호출 및 상태 관리
+    
+    ```typescript
+    // Login.tsx - 구글 로그인 핸들러
+    const googleLoginMutation = useGoogleLoginMutation();
+    
+    const handleGoogleLogin = useGoogleLogin({
+        onSuccess: async (response) => {
+            try {
+                // Access Token을 백엔드로 전송
+                await googleLoginMutation.mutateAsync(response.access_token);
+                navigate("/");
+            } catch (error) {
+                console.error(error);
+            }
+        },
+        onError: () => {
+            setError("root", { 
+                type: "manual", 
+                message: "Google 로그인에 실패했습니다." 
+            });
+        }
+    });
+    
+    // 버튼 클릭 시 호출
+    <Button onClick={() => handleGoogleLogin()}>
+        Google로 로그인
+    </Button>
+    ```
+    
+    ```typescript
+    // useAuthMutations.ts - 구글 로그인 Mutation
+    export const useGoogleLoginMutation = () => {
+        const { storeLogin } = useAuthStore();
+        return useMutation({
+            mutationFn: async (token: string) => {
+                const response = await googleLogin(token);
+                return response;
+            },
+            onSuccess: (data) => {
+                storeLogin(data.user.username); // 전역 상태 업데이트
+            },
+            onError: (error) => {
+                console.error(error);
+            }
+        })
+    }
+    ```
+    
+    **5) 인증 플로우 요약**
+    ```
+    [사용자] → Google 로그인 버튼 클릭
+         ↓
+    [Google OAuth] → Access Token 발급
+         ↓
+    [Frontend] → Access Token을 Backend로 전송
+         ↓
+    [Backend] → Google API로 Token 검증 및 사용자 정보 조회
+         ↓
+    [Backend] → DB에서 소셜 계정 조회/생성 및 유저 연동
+         ↓
+    [Backend] → JWT 토큰 발급 및 쿠키 저장
+         ↓
+    [Frontend] → 로그인 상태 업데이트 및 메인 페이지로 이동
+    ``` 
+
 
 #### 🚨 이슈/트러블슈팅
 [이슈1]  
@@ -332,7 +515,9 @@ const onSubmit = async (values: FormValues) => {
 
 
 **참고 링크**:
-- 
+- [zod 라이브러리](https://zod.dev/?id=introduction)
+- [zod 스키마 정의](https://zod.dev/api?id=primitives)
+
 
 #### 📌 내일 할 일
 - [ ] 구글 OAuth 구현

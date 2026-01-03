@@ -1,4 +1,4 @@
-import { checkEmail, forgotPassword, login, resetPassword, signup } from "@/api/auth.api";
+import { checkEmail, forgotPassword, login, resetPassword, signup, googleLogin } from "@/api/auth.api";
 import type { LoginProps } from "@/pages/auth/Login";
 import type { SignupProps } from "@/pages/auth/Signup";
 import { useAuthStore } from "@/store/authStore"
@@ -67,6 +67,23 @@ export const useResetPasswordMutation = () => {
         mutationFn: async (data: any) => {
             const response = await resetPassword(data);
             return response;
+        }
+    })
+}
+
+// 구글 로그인 Mutation
+export const useGoogleLoginMutation = () => {
+    const { storeLogin } = useAuthStore();
+    return useMutation({
+        mutationFn: async (token: string) => {
+            const response = await googleLogin(token);
+            return response;
+        },
+        onSuccess: (data) => {
+            storeLogin(data.user.username);
+        },
+        onError: (error) => {
+            console.error(error);
         }
     })
 }
