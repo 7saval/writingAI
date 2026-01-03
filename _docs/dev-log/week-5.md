@@ -118,6 +118,7 @@ Week 5: ███████████░░░ 85%
 - ✅ 사용자 인증 API(verify-user) tanstack query로 구현
 - ✅ 비밀번호 찾기, 재설정 화면 및 기능 구현
 - ✅ 구글 OAuth 구현
+- ✅ 백엔드 Google OAuth 토큰 검증 시 Google API 호출 ➡️ google-auth-library 라이브러리 활용
 
 
 #### 📝 작업 상세
@@ -272,16 +273,79 @@ const onSubmit = async (values: FormValues) => {
             - 신규 유저면 → 새 유저 생성 + 소셜 계정 연결
     - **JWT 토큰 발급**: 로그인 성공 시 JWT 생성 및 쿠키에 저장
     
+    **📚 Google OAuth 토큰 검증 방식 비교**
+    
+    Google OAuth에서 백엔드로 토큰을 검증하는 방식은 크게 두 가지가 있습니다:
+    
+    **방식 1: Access Token 검증 (fetch 사용)**
     ```typescript
-    // authController.ts - googleLogin 함수 (핵심 로직)
+    // 프론트엔드에서 Access Token을 받아서 검증
+    const googleResponse = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+        headers: { Authorization: `Bearer ${accessToken}` }
+    });
+    const payload = await googleResponse.json();
+    ```
+    
+    - ✅ **장점**: 간단하고 직관적, 추가 라이브러리 불필요
+    - ⚠️ **단점**: Access Token은 보안성이 상대적으로 낮음 (서명 검증 없음)
+    - 📌 **사용 시나리오**: 빠른 프로토타입, 간단한 인증
+    
+    **방식 2: ID Token 검증 (google-auth-library 사용) ⭐ 권장**
+    ```typescript
+    import { OAuth2Client } from 'google-auth-library';
+    
+    const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+    
+    // 프론트엔드에서 ID Token을 받아서 검증
+    const ticket = await client.verifyIdToken({
+        idToken: token,
+        audience: process.env.GOOGLE_CLIENT_ID
+    });
+    const payload = ticket.getPayload();
+    ```
+    
+    - ✅ **장점**: 
+        - Google 공식 라이브러리로 더 안전
+        - **서명 검증** (토큰이 실제로 Google에서 발급했는지 확인)
+        - **만료 시간 자동 검증**
+        - **Audience 검증** (우리 앱을 위한 토큰인지 확인)
+    - ⚠️ **단점**: 추가 라이브러리 필요 (`google-auth-library`)
+    - 📌 **사용 시나리오**: 프로덕션 환경, 보안이 중요한 서비스
+    
+    **🔐 보안 차이점**
+    | 항목 | Access Token | ID Token |
+    |------|-------------|----------|
+    | 서명 검증 | ❌ 없음 | ✅ 있음 |
+    | 만료 검증 | 수동 | ✅ 자동 |
+    | Audience 검증 | ❌ 없음 | ✅ 있음 |
+    | 위조 방지 | ⚠️ 낮음 | ✅ 높음 |
+    
+    **💡 결론**: 프로덕션 환경에서는 **ID Token + google-auth-library** 방식을 권장합니다.
+    
+    ---
+    
+    ```typescript
+    // authController.ts - googleLogin 함수 (ID Token 방식으로 구현)
+    import { OAuth2Client } from 'google-auth-library';
+    
+    const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+    
     export async function googleLogin(req: Request, res: Response, next: NextFunction) {
         const { token } = req.body;
         
-        // 1. Google API로 Access Token 검증 및 사용자 정보 조회
-        const googleResponse = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-            headers: { Authorization: `Bearer ${token}` }
+        // 1. ID Token 검증 (google-auth-library 사용)
+        const ticket = await client.verifyIdToken({
+            idToken: token,
+            audience: process.env.GOOGLE_CLIENT_ID
         });
-        const payload = await googleResponse.json();
+        
+        const payload = ticket.getPayload();
+        if (!payload) {
+            return res.status(StatusCodes.UNAUTHORIZED).json({
+                message: '유효하지 않은 토큰입니다.'
+            });
+        }
+        
         const { sub: socialId, email, name } = payload;
         
         // 2. 소셜 계정 조회
@@ -345,31 +409,34 @@ const onSubmit = async (values: FormValues) => {
     - **TanStack Query**: `useGoogleLoginMutation` 훅으로 API 호출 및 상태 관리
     
     ```typescript
-    // Login.tsx - 구글 로그인 핸들러
+    // Login.tsx - 구글 로그인 핸들러 (ID Token 방식)
     const googleLoginMutation = useGoogleLoginMutation();
     
-    const handleGoogleLogin = useGoogleLogin({
-        onSuccess: async (response) => {
-            try {
-                // Access Token을 백엔드로 전송
-                await googleLoginMutation.mutateAsync(response.access_token);
-                navigate("/");
-            } catch (error) {
-                console.error(error);
-            }
-        },
-        onError: () => {
+    const handleGoogleSuccess = async (credentialResponse: any) => {
+        try {
+            // credentialResponse.credential이 ID Token입니다
+            await googleLoginMutation.mutateAsync(credentialResponse.credential);
+            navigate("/");
+        } catch (error) {
+            console.error(error);
             setError("root", { 
                 type: "manual", 
                 message: "Google 로그인에 실패했습니다." 
             });
         }
-    });
+    };
     
-    // 버튼 클릭 시 호출
-    <Button onClick={() => handleGoogleLogin()}>
-        Google로 로그인
-    </Button>
+    const handleGoogleError = () => {
+        setError("root", { type: "manual", message: "Google 로그인에 실패했습니다." });
+    };
+    
+    // GoogleLogin 컴포넌트 사용 (ID Token을 자동으로 제공)
+    <GoogleLogin
+        onSuccess={handleGoogleSuccess}
+        onError={handleGoogleError}
+        text="continue_with"
+        width="100%"
+    />
     ```
     
     ```typescript

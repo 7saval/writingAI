@@ -9,13 +9,22 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { logout } from "@/api/auth.api";
 import { useAuthStore } from "@/store/authStore";
+import { googleLogout } from "@react-oauth/google";
+import { useNavigate } from "react-router-dom";
 
 function Header() {
     const { isLoggedIn, storeLogout, username } = useAuthStore();
+    const navigate = useNavigate();
+
     const handleLogout = async () => {
         try {
             await logout();
+
+            // Google 세션 완전히 제거
+            googleLogout();
+
             storeLogout();
+            navigate("/login");
         } catch (error) {
             console.error(error);
         }

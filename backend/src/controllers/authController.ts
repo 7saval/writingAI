@@ -4,6 +4,8 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { User } from "../entity/Users";
 import { StatusCodes } from "http-status-codes";
+import { SocialAccount } from "../entity/SocialAccounts";
+import { OAuth2Client } from 'google-auth-library';
 
 // 회원가입
 export async function signup(req: Request, res: Response, next: NextFunction) {
@@ -217,25 +219,29 @@ export async function checkEmail(req: Request, res: Response, next: NextFunction
     }
 }
 
-import { SocialAccount } from "../entity/SocialAccounts";
+
+
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // 구글 로그인
 export async function googleLogin(req: Request, res: Response, next: NextFunction) {
     try {
-        const { token } = req.body; // Client sends Access Token
+        const { token } = req.body; // Client sends ID Token
 
-        // Access Token으로 유저 정보 조회
-        const googleResponse = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-            headers: { Authorization: `Bearer ${token}` }
+        // ID Token 검증 (google-auth-library 사용)
+        const ticket = await client.verifyIdToken({
+            idToken: token,
+            audience: process.env.GOOGLE_CLIENT_ID
         });
 
-        if (!googleResponse.ok) {
+        const payload = ticket.getPayload();
+
+        if (!payload) {
             return res.status(StatusCodes.UNAUTHORIZED).json({
                 message: '유효하지 않은 토큰입니다.'
             });
         }
 
-        const payload = await googleResponse.json();
         const { sub: socialId, email, name } = payload;
 
         if (!email) {
