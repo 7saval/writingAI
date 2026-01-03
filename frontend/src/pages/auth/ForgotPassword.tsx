@@ -1,74 +1,128 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { CheckCircle } from "lucide-react";
-import { useState } from "react"
-import { Link, useNavigate } from "react-router-dom"
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { useForgotPasswordMutation } from "@/hooks/useAuthMutations";
+import { useToast } from "@/hooks/useToast";
+import {
+    Form,
+    FormControl,
+    FormField,
+    FormItem,
+    FormLabel,
+    FormMessage,
+} from "@/components/ui/form";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { CheckCircle2, Copy } from "lucide-react";
+
+const formSchema = z.object({
+    email: z.string().email({ message: "유효한 이메일 주소를 입력해주세요." }),
+});
+
+type FormValues = z.infer<typeof formSchema>;
 
 const ForgotPassword = () => {
-    const [email, setEmail] = useState("")
-    const [error, setError] = useState<string | null>(null)
-    const [isLoading, setIsLoading] = useState(false)
-    const [resetToken, setResetToken] = useState<string | null>(null)
-    const navigate = useNavigate()
+    const navigate = useNavigate();
+    const { toast } = useToast();
+    const { mutateAsync: forgotPasswordMutate, isPending } = useForgotPasswordMutation();
+    const [verificationCode, setVerificationCode] = useState<string | null>(null);
+    const [submittedEmail, setSubmittedEmail] = useState<string>("");
 
-    const handleResetPassword = async (e: React.FormEvent) => {
-        e.preventDefault()
-        setIsLoading(true)
-        setError(null)
+    const form = useForm<FormValues>({
+        resolver: zodResolver(formSchema),
+        defaultValues: {
+            email: "",
+        },
+    });
 
-        //     const result = requestPasswordReset(email)
+    const onSubmit = async (values: FormValues) => {
+        try {
+            const response = await forgotPasswordMutate({ email: values.email });
 
-        //     if (result.success) {
-        //       // 토큰을 가져와서 다음 페이지로 전달
-        //       const token = localStorage.getItem(`reset_token_${email}`)
-        //       if (token) {
-        //         setResetToken(token)
-        //       }
-        //     } else {
-        //       setError(result.error || "비밀번호 재설정 요청에 실패했습니다")
-        //     }
-
-        //     setIsLoading(false)
-    }
+            // 개발용: 인증 코드 표시
+            if (response.code) {
+                setVerificationCode(response.code);
+                setSubmittedEmail(values.email);
+                toast({
+                    title: "인증 코드 발송",
+                    description: "이메일로 인증 코드가 발송되었습니다. (개발용: 화면 확인)",
+                });
+            } else {
+                // 실제 운영 환경에서는 바로 이동하거나 메시지 표시
+                toast({
+                    title: "이메일 발송 완료",
+                    description: "비밀번호 재설정 링크가 이메일로 전송되었습니다.",
+                });
+            }
+        } catch (error: any) {
+            toast({
+                variant: "destructive",
+                title: "오류 발생",
+                description: error.response?.data?.message || "비밀번호 재설정 요청에 실패했습니다.",
+            });
+        }
+    };
 
     const handleContinue = () => {
-        // 이메일과 토큰을 URL 파라미터로 전달
-        navigate(`/reset-password?email=${encodeURIComponent(email)}&token=${resetToken}`)
-    }
+        navigate(`/reset-password?email=${encodeURIComponent(submittedEmail)}`);
+    };
 
-    if (resetToken) {
+    if (verificationCode) {
         return (
             <div className="flex min-h-full w-full items-center justify-center p-6">
                 <div className="w-full max-w-sm">
-                    <div className="flex flex-col gap-6">
-                        <Card>
-                            <CardHeader>
-                                <div className="flex justify-center mb-4">
-                                    <CheckCircle className="h-12 w-12 text-green-500" />
-                                </div>
-                                <CardTitle className="text-2xl text-center">인증 완료</CardTitle>
-                                <CardDescription className="text-center">새 비밀번호를 설정하세요</CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <p className="text-sm text-muted-foreground mb-4 text-center">
-                                    <strong>{email}</strong> 계정의 비밀번호를 재설정할 수 있습니다.
-                                </p>
+                    <Card>
+                        <CardHeader>
+                            <div className="flex justify-center mb-4">
+                                <CheckCircle2 className="h-12 w-12 text-green-500" />
+                            </div>
+                            <CardTitle className="text-2xl text-center">인증 코드 발급 완료</CardTitle>
+                            <CardDescription className="text-center">
+                                아래의 인증 코드를 복사하여 다음 단계에서 입력해주세요.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            <Alert className="bg-muted">
+                                <AlertTitle className="flex items-center justify-between">
+                                    <span>인증 코드</span>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-6 w-6"
+                                        onClick={() => {
+                                            navigator.clipboard.writeText(verificationCode);
+                                            toast({ description: "코드가 복사되었습니다." });
+                                        }}
+                                    >
+                                        <Copy className="h-4 w-4" />
+                                    </Button>
+                                </AlertTitle>
+                                <AlertDescription className="mt-2 text-2xl font-bold font-mono tracking-widest text-center">
+                                    {verificationCode}
+                                </AlertDescription>
+                            </Alert>
+
+                            <div className="space-y-2">
                                 <Button className="w-full" onClick={handleContinue}>
-                                    새 비밀번호 설정하기
+                                    비밀번호 재설정하러 가기
                                 </Button>
-                                <div className="mt-4 text-center text-sm">
-                                    <Link to="/auth/login" className="text-primary hover:underline">
-                                        로그인으로 돌아가기
-                                    </Link>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </div>
+                                <Button
+                                    variant="outline"
+                                    className="w-full"
+                                    onClick={() => setVerificationCode(null)}
+                                >
+                                    다시 시도하기
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
                 </div>
             </div>
-        )
+        );
     }
 
     return (
@@ -81,36 +135,38 @@ const ForgotPassword = () => {
                             <CardDescription>이메일을 입력하여 비밀번호를 재설정하세요</CardDescription>
                         </CardHeader>
                         <CardContent>
-                            <form onSubmit={handleResetPassword}>
-                                <div className="flex flex-col gap-6">
-                                    <div className="grid gap-2">
-                                        <Label htmlFor="email">이메일</Label>
-                                        <Input
-                                            id="email"
-                                            type="email"
-                                            placeholder="example@email.com"
-                                            required
-                                            value={email}
-                                            onChange={(e) => setEmail(e.target.value)}
-                                        />
-                                    </div>
-                                    {error && <p className="text-sm text-destructive">{error}</p>}
-                                    <Button type="submit" className="w-full" disabled={isLoading}>
-                                        {isLoading ? "확인 중..." : "계속하기"}
+                            <Form {...form}>
+                                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                                    <FormField
+                                        control={form.control}
+                                        name="email"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>이메일</FormLabel>
+                                                <FormControl>
+                                                    <Input placeholder="example@email.com" {...field} />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+
+                                    <Button type="submit" className="w-full" disabled={isPending}>
+                                        {isPending ? "확인 중..." : "인증 코드 받기"}
                                     </Button>
-                                </div>
-                                <div className="mt-4 text-center text-sm">
-                                    <Link to="/login" className="text-primary hover:underline">
-                                        로그인으로 돌아가기
-                                    </Link>
-                                </div>
-                            </form>
+                                </form>
+                            </Form>
+                            <div className="mt-4 text-center text-sm">
+                                <Link to="/login" className="text-primary hover:underline">
+                                    로그인으로 돌아가기
+                                </Link>
+                            </div>
                         </CardContent>
                     </Card>
                 </div>
             </div>
         </div>
-    )
+    );
 }
 
 export default ForgotPassword;

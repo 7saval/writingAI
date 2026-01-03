@@ -48,3 +48,15 @@ export const verifyUser = async () => {
     const response = await apiClient.get<VerifyUserResponse>(`/auth/verify-user`);
     return response.data;
 }
+
+// 비밀번호 찾기
+export const forgotPassword = async (email: Pick<LoginProps, 'email'>) => {
+    const response = await apiClient.post(`/auth/forgot-password`, email);
+    return response.data;
+}
+
+// 비밀번호 초기화
+export const resetPassword = async (data: { email: string; code: string; newPassword: string }) => {
+    const response = await apiClient.post(`/auth/reset-password`, data);
+    return response.data;
+}

@@ -4,7 +4,7 @@ import { routeList } from './utils/routeList';
 import Layout from './components/layout/Layout';
 import Error from './components/common/Error';
 import { useAuthQuery } from './hooks/useAuthQuery';
-import { Toaster } from '@/components/ui/toaster';
+import { Toaster } from '@/components/ui/sonner';
 
 const router = createBrowserRouter(routeList.map((item) => {
   return {

@@ -4,6 +4,7 @@ import Signup from "@/pages/auth/Signup";
 import Home from "@/pages/Home";
 import WritingSession from "@/pages/WritingSession";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
+import ResetPassword from "@/pages/auth/ResetPassword";
 
 export const routeList = [
     {
@@ -21,6 +22,10 @@ export const routeList = [
     {
         path: "/forgot-password",
         element: <ForgotPassword />
+    },
+    {
+        path: "/reset-password",
+        element: <ResetPassword />
     },
     {
         path: "/projects",

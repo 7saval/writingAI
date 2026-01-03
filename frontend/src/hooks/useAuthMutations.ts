@@ -1,4 +1,4 @@
-import { checkEmail, login, signup } from "@/api/auth.api";
+import { checkEmail, forgotPassword, login, resetPassword, signup } from "@/api/auth.api";
 import type { LoginProps } from "@/pages/auth/Login";
 import type { SignupProps } from "@/pages/auth/Signup";
 import { useAuthStore } from "@/store/authStore"
@@ -47,6 +47,26 @@ export const useEmailCheckMutation = () => {
         },
         onError: (error: AxiosError<{ message: string }>) => {
             console.error(error);
+        }
+    })
+}
+
+// 비밀번호 찾기 Mutation
+export const useForgotPasswordMutation = () => {
+    return useMutation({
+        mutationFn: async (data: any) => {
+            const response = await forgotPassword(data);
+            return response;
+        }
+    })
+}
+
+// 비밀번호 재설정 Mutation
+export const useResetPasswordMutation = () => {
+    return useMutation({
+        mutationFn: async (data: any) => {
+            const response = await resetPassword(data);
+            return response;
         }
     })
 }

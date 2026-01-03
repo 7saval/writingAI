@@ -5,8 +5,8 @@ import { Label } from "@/components/ui/label";
 import { useLoginMutation } from "@/hooks/useAuthMutations";
 import { useForm } from "react-hook-form";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { useToast } from "@/hooks/use-toast";
-import { useEffect } from "react";
+import { useToast } from "@/hooks/useToast";
+import { useEffect, useRef } from "react";
 
 export interface LoginProps {
     email: string;
@@ -19,13 +19,16 @@ const Login = () => {
     const { toast } = useToast();
     const loginMutation = useLoginMutation();
 
+    const toastShownRef = useRef(false);
+
     useEffect(() => {
         const message = location.state?.message;
-        if (message) {
+        if (message && !toastShownRef.current) {
             toast({
                 title: "알림",
                 description: message,
             });
+            toastShownRef.current = true;
             // 메시지를 한 번 보여준 후 state를 비워서 새로고침 시 다시 뜨지 않게 함
             navigate(location.pathname, { replace: true, state: {} });
         }
