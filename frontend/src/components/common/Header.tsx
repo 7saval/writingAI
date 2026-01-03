@@ -11,10 +11,14 @@ import { logout } from "@/api/auth.api";
 import { useAuthStore } from "@/store/authStore";
 import { googleLogout } from "@react-oauth/google";
 import { useNavigate } from "react-router-dom";
+import { useToast } from "@/hooks/useToast";
+import { useQueryClient } from "@tanstack/react-query";
 
 function Header() {
-    const { isLoggedIn, storeLogout, username } = useAuthStore();
+    const { isLoggedIn, username } = useAuthStore();
     const navigate = useNavigate();
+    const { toast } = useToast();
+    const queryClient = useQueryClient();
 
     const handleLogout = async () => {
         try {
@@ -23,8 +27,15 @@ function Header() {
             // Google 세션 완전히 제거
             googleLogout();
 
-            storeLogout();
-            navigate("/login");
+            navigate("/", { replace: true });
+
+            // 쿼리 무효화를 통해 비동기적으로 인증 상태 업데이트 유도
+            queryClient.invalidateQueries({ queryKey: ["authUser"] });
+
+            // 로그아웃 성공 토스트 메시지
+            toast({
+                description: "로그아웃되었습니다."
+            });
         } catch (error) {
             console.error(error);
         }
