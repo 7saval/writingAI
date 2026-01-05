@@ -272,23 +272,45 @@ export async function googleLogin(req: Request, res: Response, next: NextFunctio
             if (existingUser) {
                 // 기존 유저 존재 -> 소셜 계정 연동
                 user = existingUser;
-            } else {
-                // 신규 유저 생성
-                user = userRepo.create({
-                    email,
-                    username: name || 'User',
-                    password: undefined // 소셜 유저는 비밀번호 없음
-                });
-                await userRepo.save(user);
-            }
 
-            // 소셜 계정 생성 및 연결
-            socialAccount = socialRepo.create({
-                provider: 'google',
-                socialId,
-                user
-            });
-            await socialRepo.save(socialAccount);
+                // 바로 신규 유저 생성할 때
+                // } else {
+                //     // 신규 유저 생성
+                //     user = userRepo.create({
+                //         email,
+                //         username: name || 'User',
+                //         password: undefined // 소셜 유저는 비밀번호 없음
+                //     });
+                //     await userRepo.save(user);
+                // }
+
+                // 소셜 계정 생성 및 연결
+                socialAccount = socialRepo.create({
+                    provider: 'google',
+                    socialId,
+                    user
+                });
+                await socialRepo.save(socialAccount);
+            } else {
+                // 신규 유저 -> 추가 정보 입력을 위한 토큰 발급
+                const signupToken = jwt.sign({
+                    email,
+                    socialId,
+                    provider: 'google',
+                    name: name || 'User'
+                }, process.env.JWT_SECRET!, {
+                    expiresIn: '30m' // 30분간 유효
+                });
+
+                return res.status(StatusCodes.OK).json({
+                    isNewUser: true,
+                    signupToken,
+                    profile: {
+                        email,
+                        name: name || 'User'
+                    }
+                });
+            }
         }
 
         // 로그인 처리
@@ -314,6 +336,71 @@ export async function googleLogin(req: Request, res: Response, next: NextFunctio
 
     } catch (error) {
         console.error("Google Login Error:", error);
+        next(error);
+    }
+}
+
+// 소셜 회원가입 완료
+export async function completeSocialSignup(req: Request, res: Response, next: NextFunction) {
+    try {
+        const { signupToken, nickname } = req.body;
+
+        if (!signupToken || !nickname) {
+            return res.status(StatusCodes.BAD_REQUEST).json({
+                message: '필수 정보가 누락되었습니다.'
+            });
+        }
+
+        // 토큰 검증
+        const decoded = jwt.verify(signupToken, process.env.JWT_SECRET!) as any;
+        const { email, socialId, provider } = decoded;
+
+        const userRepo = AppDataSource.getRepository(User);
+        const socialRepo = AppDataSource.getRepository(SocialAccount);
+
+        // 1. 유저 생성
+        const user = userRepo.create({
+            email,
+            username: nickname, // 사용자가 입력한 닉네임 사용
+            password: undefined
+        });
+        await userRepo.save(user);
+
+        // 2. 소셜 계정 연결
+        const socialAccount = socialRepo.create({
+            provider,
+            socialId,
+            user
+        });
+        await socialRepo.save(socialAccount);
+
+        // 3. 로그인 토큰 발급
+        const token = jwt.sign({
+            id: user.id,
+            email: user.email
+        }, process.env.JWT_SECRET!, {
+            expiresIn: process.env.JWT_EXPIRES_IN as any
+        });
+
+        res.cookie("token", token, {
+            httpOnly: true
+        });
+
+        res.status(StatusCodes.CREATED).json({
+            message: '회원가입 및 로그인이 완료되었습니다.',
+            token,
+            user: {
+                username: user.username,
+                email: user.email
+            }
+        });
+
+    } catch (error: any) {
+        if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
+            return res.status(StatusCodes.UNAUTHORIZED).json({
+                message: '유효기간이 만료되었거나 잘못된 토큰입니다. 다시 소셜 로그인을 시도해 주세요.'
+            });
+        }
         next(error);
     }
 }

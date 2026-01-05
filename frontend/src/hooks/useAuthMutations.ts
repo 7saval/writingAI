@@ -1,10 +1,9 @@
-import { checkEmail, forgotPassword, login, resetPassword, signup, googleLogin } from "@/api/auth.api";
+import { checkEmail, forgotPassword, login, resetPassword, signup, googleLogin, socialSignup } from "@/api/auth.api";
 import type { LoginProps } from "@/pages/auth/Login";
 import type { SignupProps } from "@/pages/auth/Signup";
 import { useAuthStore } from "@/store/authStore"
 import { useMutation } from "@tanstack/react-query";
 import type { AxiosError } from "axios";
-import { useState } from "react";
 
 // 로그인 Mutation
 export const useLoginMutation = () => {
@@ -17,7 +16,9 @@ export const useLoginMutation = () => {
         },
         onSuccess: (data) => {
             // 로그인 성공 시 전역 상태 업데이트
-            storeLogin(data.user.username);
+            if (data.user) {
+                storeLogin(data.user.username);
+            }
         },
         onError: (error) => {
             console.error(error);
@@ -80,10 +81,28 @@ export const useGoogleLoginMutation = () => {
             return response;
         },
         onSuccess: (data) => {
-            storeLogin(data.user.username);
+            if (data.user) {
+                storeLogin(data.user.username);
+            }
         },
         onError: (error) => {
             console.error(error);
+        }
+    })
+}
+
+// 소셜 회원가입 Mutation
+export const useSocialSignupMutation = () => {
+    const { storeLogin } = useAuthStore();
+    return useMutation({
+        mutationFn: async (data: { signupToken: string; nickname: string }) => {
+            const response = await socialSignup(data);
+            return response;
+        },
+        onSuccess: (data: any) => {
+            if (data.user) {
+                storeLogin(data.user.username);
+            }
         }
     })
 }

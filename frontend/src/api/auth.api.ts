@@ -15,10 +15,17 @@ export const checkEmail = async (email: Pick<SignupProps, 'email'>) => {
 }
 
 // 로그인 반환 타입
-interface LoginResponse {
-    token: string;
-    user: {
+export interface LoginResponse {
+    token?: string;
+    isNewUser?: boolean;
+    signupToken?: string;
+    profile?: {
+        email: string;
+        name: string;
+    };
+    user?: {
         username: string;
+        email: string;
     };
 }
 
@@ -64,5 +71,11 @@ export const resetPassword = async (data: { email: string; code: string; newPass
 // 구글 로그인
 export const googleLogin = async (token: string) => {
     const response = await apiClient.post<LoginResponse>(`/auth/google`, { token });
+    return response.data;
+}
+
+// 소셜 회원가입 완료
+export const socialSignup = async (data: { signupToken: string; nickname: string }) => {
+    const response = await apiClient.post<LoginResponse>(`/auth/social-signup`, data);
     return response.data;
 }

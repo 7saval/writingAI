@@ -95,8 +95,19 @@ const Login = () => {
     const handleGoogleSuccess = async (credentialResponse: any) => {
         try {
             // credentialResponse.credential이 ID Token입니다
-            await googleLoginMutation.mutateAsync(credentialResponse.credential);
-            navigate("/");
+            const res = await googleLoginMutation.mutateAsync(credentialResponse.credential);
+
+            if (res.isNewUser) {
+                // 신규 유저인 경우 추가 정보 입력 페이지로 이동
+                navigate("/extra-info", {
+                    state: {
+                        signupToken: res.signupToken,
+                        profile: res.profile
+                    }
+                });
+            } else {
+                navigate("/");
+            }
         } catch (error) {
             console.error(error);
             setError("root", { type: "manual", message: "Google 로그인에 실패했습니다." });
