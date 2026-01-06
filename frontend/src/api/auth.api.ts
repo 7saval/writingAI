@@ -16,7 +16,8 @@ export const checkEmail = async (email: Pick<SignupProps, 'email'>) => {
 
 // 로그인 반환 타입
 export interface LoginResponse {
-    token?: string;
+    authenticated?: boolean;
+    accessToken?: string;
     isNewUser?: boolean;
     signupToken?: string;
     profile?: {
@@ -27,6 +28,12 @@ export interface LoginResponse {
         username: string;
         email: string;
     };
+}
+
+// 토큰 갱신
+export const refresh = async () => {
+    const response = await apiClient.post<{ accessToken: string }>(`/auth/refresh`);
+    return response.data;
 }
 
 // 로그인

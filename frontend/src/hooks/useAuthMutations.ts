@@ -16,8 +16,8 @@ export const useLoginMutation = () => {
         },
         onSuccess: (data) => {
             // 로그인 성공 시 전역 상태 업데이트
-            if (data.user) {
-                storeLogin(data.user.username);
+            if (data.user && data.accessToken) {
+                storeLogin(data.user.username, data.accessToken);
             }
         },
         onError: (error) => {
@@ -81,8 +81,8 @@ export const useGoogleLoginMutation = () => {
             return response;
         },
         onSuccess: (data) => {
-            if (data.user) {
-                storeLogin(data.user.username);
+            if (data.user && data.accessToken) {
+                storeLogin(data.user.username, data.accessToken);
             }
         },
         onError: (error) => {
@@ -100,8 +100,8 @@ export const useSocialSignupMutation = () => {
             return response;
         },
         onSuccess: (data: any) => {
-            if (data.user) {
-                storeLogin(data.user.username);
+            if (data.user && data.accessToken) {
+                storeLogin(data.user.username, data.accessToken);
             }
         }
     })

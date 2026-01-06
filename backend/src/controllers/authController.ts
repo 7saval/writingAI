@@ -58,21 +58,31 @@ export async function login(req: Request, res: Response, next: NextFunction) {
         });
 
         // JWT 토큰 발급
-        const token = jwt.sign({
+        const accessToken = jwt.sign({
             id: user.id,
             email: user.email
-        }, process.env.JWT_SECRET!, {
-            expiresIn: process.env.JWT_EXPIRES_IN as any
+        }, process.env.ACCESS_TOKEN_SECRET as string, {
+            expiresIn: process.env.ACCESS_TOKEN_EXPIRES_IN || '15m' as any
         });
 
-        // 쿠키에 토큰 담기 - 토큰 변수에 토큰 담기
-        res.cookie("token", token, {
-            httpOnly: true
+        const refreshToken = jwt.sign({
+            id: user.id,
+            email: user.email
+        }, process.env.REFRESH_TOKEN_SECRET as string, {
+            expiresIn: process.env.REFRESH_TOKEN_EXPIRES_IN || '7d' as any
+        });
+
+        // 리프레시 토큰을 쿠키에 저장
+        res.cookie("refreshToken", refreshToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 7 * 24 * 60 * 60 * 1000 // 7일
         });
 
         res.status(StatusCodes.OK).json({
             message: '로그인이 완료되었습니다.',
-            token,
+            accessToken,
             user: {
                 username: user.username
             }
@@ -85,7 +95,7 @@ export async function login(req: Request, res: Response, next: NextFunction) {
 // 로그아웃
 export async function logout(req: Request, res: Response, next: NextFunction) {
     try {
-        res.clearCookie("token");
+        res.clearCookie("refreshToken");
         res.status(StatusCodes.OK).json({
             message: '로그아웃이 완료되었습니다.'
         });
@@ -314,20 +324,30 @@ export async function googleLogin(req: Request, res: Response, next: NextFunctio
         }
 
         // 로그인 처리
-        const jwtToken = jwt.sign({
+        const accessToken = jwt.sign({
             id: user.id,
             email: user.email
-        }, process.env.JWT_SECRET!, {
-            expiresIn: process.env.JWT_EXPIRES_IN as any
+        }, process.env.ACCESS_TOKEN_SECRET as string, {
+            expiresIn: (process.env.ACCESS_TOKEN_EXPIRES_IN || '15m') as any
         });
 
-        res.cookie("token", jwtToken, {
-            httpOnly: true
+        const refreshToken = jwt.sign({
+            id: user.id,
+            email: user.email
+        }, process.env.REFRESH_TOKEN_SECRET as string, {
+            expiresIn: (process.env.REFRESH_TOKEN_EXPIRES_IN || '7d') as any
+        });
+
+        res.cookie("refreshToken", refreshToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 7 * 24 * 60 * 60 * 1000
         });
 
         res.status(StatusCodes.OK).json({
             message: '구글 로그인이 완료되었습니다.',
-            token: jwtToken,
+            accessToken,
             user: {
                 username: user.username,
                 email: user.email
@@ -352,7 +372,7 @@ export async function completeSocialSignup(req: Request, res: Response, next: Ne
         }
 
         // 토큰 검증
-        const decoded = jwt.verify(signupToken, process.env.JWT_SECRET!) as any;
+        const decoded = jwt.verify(signupToken, process.env.JWT_SECRET!) as jwt.JwtPayload;
         const { email, socialId, provider } = decoded;
 
         const userRepo = AppDataSource.getRepository(User);
@@ -375,20 +395,30 @@ export async function completeSocialSignup(req: Request, res: Response, next: Ne
         await socialRepo.save(socialAccount);
 
         // 3. 로그인 토큰 발급
-        const token = jwt.sign({
+        const accessToken = jwt.sign({
             id: user.id,
             email: user.email
-        }, process.env.JWT_SECRET!, {
-            expiresIn: process.env.JWT_EXPIRES_IN as any
+        }, process.env.ACCESS_TOKEN_SECRET as string, {
+            expiresIn: process.env.ACCESS_TOKEN_EXPIRES_IN || '15m' as any
         });
 
-        res.cookie("token", token, {
-            httpOnly: true
+        const refreshToken = jwt.sign({
+            id: user.id,
+            email: user.email
+        }, process.env.REFRESH_TOKEN_SECRET as string, {
+            expiresIn: process.env.REFRESH_TOKEN_EXPIRES_IN || '7d' as any
+        });
+
+        res.cookie("refreshToken", refreshToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 7 * 24 * 60 * 60 * 1000
         });
 
         res.status(StatusCodes.CREATED).json({
             message: '회원가입 및 로그인이 완료되었습니다.',
-            token,
+            accessToken,
             user: {
                 username: user.username,
                 email: user.email
@@ -402,5 +432,53 @@ export async function completeSocialSignup(req: Request, res: Response, next: Ne
             });
         }
         next(error);
+    }
+}
+
+// 토큰 갱신
+export async function refresh(req: Request, res: Response, next: NextFunction) {
+    try {
+        const refreshToken = req.cookies.refreshToken;
+
+        if (!refreshToken) {
+            return res.status(StatusCodes.OK).json({
+                authenticated: false,
+                message: '리프레시 토큰이 없습니다.'
+            });
+        }
+
+        // 토큰 검증
+        const decoded = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET as string) as jwt.JwtPayload;
+
+        const repo = AppDataSource.getRepository(User);
+        const user = await repo.findOneBy({ id: decoded.id });
+
+        if (!user) {
+            return res.status(StatusCodes.UNAUTHORIZED).json({
+                message: '사용자를 찾을 수 없습니다.'
+            });
+        }
+
+        // 새로운 액세스 토큰 발급
+        const accessToken = jwt.sign({
+            id: user.id,
+            email: user.email
+        }, process.env.ACCESS_TOKEN_SECRET as string, {
+            expiresIn: (process.env.ACCESS_TOKEN_EXPIRES_IN || '15m') as any
+        });
+
+        res.status(StatusCodes.OK).json({
+            accessToken
+        });
+
+    } catch (error: any) {
+        if (error.name === 'TokenExpiredError') {
+            return res.status(StatusCodes.UNAUTHORIZED).json({
+                message: '리프레시 토큰이 만료되었습니다. 다시 로그인해 주세요.'
+            });
+        }
+        res.status(StatusCodes.UNAUTHORIZED).json({
+            message: '유효하지 않은 리프레시 토큰입니다.'
+        });
     }
 }
