@@ -50,6 +50,7 @@ export const logout = async () => {
 
 interface VerifyUserResponse {
     authenticated: boolean;
+    accessToken: string;
     message: string;
     user: {
         username: string;

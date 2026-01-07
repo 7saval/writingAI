@@ -11,7 +11,7 @@ export const useAuthQuery = () => {
             try {
                 const response = await verifyUser();
                 if (response.authenticated) {
-                    storeLogin(response.user.username);
+                    storeLogin(response.user.username, response.accessToken);
                     return response;
                 }
                 storeLogout();
