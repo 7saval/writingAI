@@ -20,7 +20,7 @@ export class User {
     @Column({ type: 'varchar', nullable: true })
     resetCode?: string | null;
 
-    @Column({ type: 'datetime', nullable: true })
+    @Column({ type: 'timestamp', nullable: true })
     resetCodeExpires?: Date | null;
 
     @CreateDateColumn({ type: 'timestamp' })

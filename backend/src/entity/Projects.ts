@@ -20,7 +20,7 @@ export class Project {
     @Column({ type: 'text', nullable: true })
     synopsis?: string;
 
-    @Column({ type: 'json', nullable: true, default: '[]' })
+    @Column({ type: 'jsonb', nullable: true, default: [] })
     lorebook?: any[] | null;
 
     @CreateDateColumn({ type: 'timestamp' })
