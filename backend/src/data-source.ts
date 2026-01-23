@@ -17,12 +17,12 @@ export const AppDataSource = new DataSource({
     username: process.env.DB_USERNAME,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_DATABASE,
-    // ssl: true,
-    // extra: {
     ssl: {
         rejectUnauthorized: false,
     },
-    // },
+    extra: {
+        family: 4, // IPv4 강제
+    },
     entities: [User, Project, Paragraph, SocialAccount],
     migrations: ["./src/migrations/**/*.ts"],   // 마이그레이션 파일 위치
     // synchronize: true,     // 운영 전환 시 true → false
