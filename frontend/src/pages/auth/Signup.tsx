@@ -2,7 +2,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useAuth } from "@/hooks/useAuth";
 import { useSignupMutation, useEmailCheckMutation } from "@/hooks/useAuthMutations";
 import { useForm } from "react-hook-form";
 import { Link, useNavigate } from "react-router-dom";
@@ -31,7 +30,7 @@ const Signup = () => {
         setError,
         clearErrors,
         getValues,
-        formState: { errors, isSubmitting }
+        formState: { errors }
     } = useForm<SignupProps>();
 
     const onSubmit = async (data: SignupProps) => {

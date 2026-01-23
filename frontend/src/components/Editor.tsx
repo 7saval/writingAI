@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
-import type { Paragraph, ParagraphWrite } from "../types/database";
+import type { Paragraph } from "../types/database";
 import { useParams } from "react-router-dom";
 import { fetchProjectParagraphs } from "../api/parapraphs.api";
 import { writeParagraph } from "../api/writing.api";
-import { StoryContextPanel } from "./StoryContextPanel";
 import ParagraphItem from "./ParagraphItem";
 
 function Editor() {

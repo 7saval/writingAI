@@ -1,7 +1,6 @@
 import { Modal } from "../../components/common/Modal";
 import { CATEGORY_OPTIONS } from "../../constants/categoryOptions";
 import { useLorebook } from "../../hooks/useLorebook";
-import { useState } from "react";
 
 interface LorebookModalProps {
     projectId: number;

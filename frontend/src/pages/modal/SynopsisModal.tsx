@@ -1,6 +1,4 @@
-import { useEffect, useState } from "react"
 import { Modal } from "../../components/common/Modal"
-import { fetchProjectContexts, updateContext } from "../../api/projects.api";
 import { useSynopsis } from "../../hooks/useSynopsis";
 
 interface SynopsisModalProps {

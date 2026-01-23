@@ -1,5 +1,7 @@
 import 'reflect-metadata';
-import 'dotenv/config';  // 추가
+if (process.env.NODE_ENV !== "production") {
+    import("dotenv/config");
+}
 import { DataSource } from 'typeorm';
 import { User } from './entity/Users';
 import { Project } from './entity/Projects';

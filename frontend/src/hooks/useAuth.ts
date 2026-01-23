@@ -10,7 +10,7 @@ export const useAuth = () => {
     const [isEmailChecked, setIsEmailChecked] = useState(false);
 
     // 상태
-    const { storeLogin, storeLogout } = useAuthStore();
+    const { storeLogin } = useAuthStore();
 
     // 회원가입
     const userSignup = async (data: SignupProps) => {
@@ -45,7 +45,9 @@ export const useAuth = () => {
     // 로그인
     const userLogin = async (data: LoginProps) => {
         const res = await login(data);
-        storeLogin(res.user.username);
+        if (res.user && res.accessToken) {
+            storeLogin(res.user.username, res.accessToken);
+        }
     }
 
     // 비밀번호 찾기
