@@ -15,6 +15,7 @@ export async function createProject(req: Request, res: Response, next: NextFunct
             description: req.body.description,
             synopsis: req.body.synopsis ?? '',
             lorebook: req.body.lorebook ?? [],
+            user: req.user!,
         });
         await repo.save(project);
         res.status(StatusCodes.CREATED).json(project);
