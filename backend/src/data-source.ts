@@ -11,18 +11,18 @@ import { SocialAccount } from './entity/SocialAccounts';
 
 export const AppDataSource = new DataSource({
     type: 'postgres',
-    // url: process.env.DATABASE_URL,
-    host: process.env.DB_HOST,
-    port: Number(process.env.DB_PORT ?? 5432),
-    username: process.env.DB_USERNAME,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_DATABASE,
+    url: process.env.DATABASE_URL,
+    // host: process.env.DB_HOST,
+    // port: Number(process.env.DB_PORT ?? 5432),
+    // username: process.env.DB_USERNAME,
+    // password: process.env.DB_PASSWORD,
+    // database: process.env.DB_DATABASE,
     ssl: {
         rejectUnauthorized: false,
     },
-    extra: {
-        family: 4, // IPv4 강제
-    },
+    // extra: {
+    //     family: 4, // IPv4 강제
+    // },
     entities: [User, Project, Paragraph, SocialAccount],
     migrations: ["./src/migrations/**/*.ts"],   // 마이그레이션 파일 위치
     // synchronize: true,     // 운영 전환 시 true → false
