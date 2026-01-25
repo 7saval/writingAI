@@ -15,7 +15,7 @@ import { useToast } from "@/hooks/useToast";
 import { useQueryClient } from "@tanstack/react-query";
 
 function Header() {
-    const { isLoggedIn, username } = useAuthStore();
+    const { isLoggedIn, username, storeLogout } = useAuthStore();
     const navigate = useNavigate();
     const { toast } = useToast();
     const queryClient = useQueryClient();
@@ -23,6 +23,9 @@ function Header() {
     const handleLogout = async () => {
         try {
             await logout();
+
+            // 로컬 인증 상태 즉시 초기화 (Zustand)
+            storeLogout();
 
             // Google 세션 완전히 제거
             googleLogout();
