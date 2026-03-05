@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import type { Paragraph } from "../types/database";
+import type { Paragraph } from "@/types/database";
 import { useParams } from "react-router-dom";
-import { fetchProjectParagraphs } from "../api/parapraphs.api";
-import { writeParagraph } from "../api/writing.api";
-import ParagraphItem from "./ParagraphItem";
+import { fetchProjectParagraphs } from "@/api/parapraphs.api";
+import { writeParagraph } from "@/api/writing.api";
+import ParagraphItem from "@/components/ParagraphItem";
+import { showAlert } from "@/store/useDialogStore";
 
 function Editor() {
   const { projectId } = useParams(); // URL에서 projectId 가져오기
@@ -83,7 +84,7 @@ function Editor() {
         prev.filter((p) => p.id !== tempUserId && p.id !== tempAiId),
       );
       setInput(userInput);
-      alert("단락 작성에 실패했습니다. 다시 시도해주세요.");
+      await showAlert("단락 작성에 실패했습니다. 다시 시도해주세요.");
     } finally {
       setIsLoading(false);
     }

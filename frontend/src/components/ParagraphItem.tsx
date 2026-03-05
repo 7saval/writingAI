@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import type { Paragraph } from "../types/database";
+import type { Paragraph } from "@/types/database";
 import {
   deleteParagraph,
   regenerateAiParagraph,
   updateParagraph,
-} from "../api/parapraphs.api";
+} from "@/api/parapraphs.api";
+import { showAlert, showConfirm } from "@/store/useDialogStore";
 
 interface ParagraphItemProps {
   paragraph: Paragraph; // 단락
@@ -56,26 +57,34 @@ function ParagraphItem({
       setIsEditing(false);
     } catch (error) {
       console.error("Failed to update paragraph:", error);
-      alert("단락 수정에 실패했습니다.");
+      await showAlert("단락 수정에 실패했습니다.");
     }
   };
 
   // 삭제
   const handleDelete = async () => {
-    if (!confirm("이 단락을 정말로 삭제하시겠습니까?")) return;
+    const isConfirmed = await showConfirm(
+      "이 단락을 정말로 삭제하시겠습니까?",
+      "단락 삭제",
+    );
+    if (!isConfirmed) return;
 
     try {
       await deleteParagraph(paragraph.id);
       onDelete(paragraph.id);
     } catch (error) {
       console.error("Failed to delete paragraph:", error);
-      alert("단락 삭제에 실패했습니다.");
+      await showAlert("단락 삭제에 실패했습니다.");
     }
   };
 
   // AI 재생성
   const handleRegenerate = async () => {
-    if (!confirm("AI 단락을 다시 생성하시겠습니까?")) return;
+    const isConfirmed = await showConfirm(
+      "AI 단락을 다시 생성하시겠습니까?",
+      "AI 단락 재생성",
+    );
+    if (!isConfirmed) return;
 
     setIsRegenerating(true);
     try {
@@ -83,7 +92,7 @@ function ParagraphItem({
       onRegenerate(paragraph.id, res.content);
     } catch (error) {
       console.error("Failed to regenerate paragraph:", error);
-      alert("AI 재생성에 실패했습니다.");
+      await showAlert("AI 재생성에 실패했습니다.");
     } finally {
       setIsRegenerating(false);
     }
