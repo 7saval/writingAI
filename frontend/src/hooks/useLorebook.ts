@@ -7,7 +7,14 @@ import {
 } from "@/hooks/useProjects";
 import { showAlert, showConfirm } from "@/store/useDialogStore";
 
-export const useLorebook = (projectId: number) => {
+interface UseLorebookOptions {
+  onSuccess?: () => void;
+}
+
+export const useLorebook = (
+  projectId: number,
+  options?: UseLorebookOptions,
+) => {
   const { data: contexts, isLoading: isQueryLoading } =
     useProjectContextsQuery(projectId);
   const { mutateAsync: updateContextAsync } = useUpdateContextMutation();
@@ -34,6 +41,7 @@ export const useLorebook = (projectId: number) => {
       setIsSubmitting(true);
       await updateContextAsync({ projectId, data: { lorebook } });
       await showAlert("저장되었습니다.");
+      options?.onSuccess?.();
     } catch (error) {
       console.error("Failed to save context", error);
       await showAlert("저장에 실패했습니다.");
