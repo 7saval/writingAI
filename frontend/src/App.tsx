@@ -1,12 +1,12 @@
 import { RouterProvider, createBrowserRouter } from "react-router-dom";
-import "./App.css";
-import { routeList } from "./utils/routeList";
-import Layout from "./components/layout/Layout";
-import Error from "./components/common/Error";
-import { useAuthQuery } from "./hooks/useAuthQuery";
+import "@/App.css";
+import { routeList } from "@/utils/routeList";
+import Layout from "@/components/layout/Layout";
+import Error from "@/components/common/Error";
+import { useAuthUserQuery as useAuthQuery } from "@/hooks/useAuth";
 import { Toaster } from "@/components/ui/sonner";
-import ShowAlert from "./components/common/alert/ShowAlert";
-import ShowConfirm from "./components/common/alert/ShowConfirm";
+import ShowAlert from "@/components/common/alert/ShowAlert";
+import ShowConfirm from "@/components/common/alert/ShowConfirm";
 
 const router = createBrowserRouter(
   routeList.map((item) => {

@@ -1,66 +1,162 @@
-import { checkEmail, login, signup } from "@/api/auth.api";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import {
+  checkEmail,
+  forgotPassword,
+  login,
+  resetPassword,
+  signup,
+  googleLogin,
+  socialSignup,
+  verifyUser,
+} from "@/api/auth.api";
 import type { LoginProps } from "@/pages/auth/Login";
 import type { SignupProps } from "@/pages/auth/Signup";
 import { useAuthStore } from "@/store/authStore";
-import { useState } from "react";
+import type { AxiosError } from "axios";
 
-export const useAuth = () => {
-    const [isLoading, setIsLoading] = useState(false);
-    const [emailError, setEmailError] = useState<string | null>(null);
-    const [isEmailChecked, setIsEmailChecked] = useState(false);
+// Query Keys
+export const authKeys = {
+  all: ["auth"] as const,
+  user: () => [...authKeys.all, "user"] as const,
+};
 
-    // 상태
-    const { storeLogin } = useAuthStore();
+/**
+ * 사용자 인증 상태를 확인하는 Query 훅
+ */
+export const useAuthUserQuery = () => {
+  const { storeLogin, storeLogout } = useAuthStore();
 
-    // 회원가입
-    const userSignup = async (data: SignupProps) => {
-        await signup(data);
-    }
-
-    // 이메일 중복 확인
-    const userEmailCheck = async (email: string) => {
-        setIsLoading(true);
-        setEmailError(null);
-
-        try {
-            const res = await checkEmail({ email });
-            setEmailError(res.message);
-            setIsEmailChecked(true);
-        } catch (error: any) {
-            setIsEmailChecked(false);
-            console.error('이메일 중복 확인 중 오류 발생:', error);
-            if (error.response && error.response.status === 409) {
-                setEmailError(error.response.data.message);
-                throw new Error(error.response.data.message);
-            } else {
-                const errorMessage = "중복 확인 중 오류가 발생했습니다.";
-                setEmailError(errorMessage);
-                throw new Error(errorMessage);
-            }
-        } finally {
-            setIsLoading(false);
+  return useQuery({
+    queryKey: authKeys.user(),
+    queryFn: async () => {
+      try {
+        const response = await verifyUser();
+        if (response.authenticated) {
+          storeLogin(response.user.username, response.accessToken);
+          return response;
         }
-    }
+        storeLogout();
+        return null;
+      } catch (error) {
+        storeLogout();
+        return null;
+      }
+    },
+    // 사용자가 앱을 사용하는 동안 인증 상태를 유지하기 위해 staleTime 설정
+    staleTime: 1000 * 60 * 5, // 5분
+    retry: false, // 인증 실패 시 반복 요청 방지
+  });
+};
 
-    // 로그인
-    const userLogin = async (data: LoginProps) => {
-        const res = await login(data);
-        if (res.user && res.accessToken) {
-            storeLogin(res.user.username, res.accessToken);
-        }
-    }
+/**
+ * 로그인 Mutation 훅
+ */
+export const useLoginMutation = () => {
+  const { storeLogin } = useAuthStore();
 
-    // 비밀번호 찾기
+  return useMutation({
+    mutationFn: async (data: LoginProps) => {
+      const response = await login(data);
+      return response;
+    },
+    onSuccess: (data) => {
+      // 로그인 성공 시 전역 상태 업데이트
+      if (data.user && data.accessToken) {
+        storeLogin(data.user.username, data.accessToken);
+      }
+    },
+    onError: (error) => {
+      console.error(error);
+    },
+  });
+};
 
-    // 비밀번호 초기화
+/**
+ * 회원가입 Mutation 훅
+ */
+export const useSignupMutation = () => {
+  return useMutation({
+    mutationFn: async (data: SignupProps) => {
+      const response = await signup(data);
+      return response;
+    },
+  });
+};
 
-    return {
-        userSignup,
-        userEmailCheck,
-        userLogin,
-        emailError,
-        isEmailChecked,
-        isLoading
-    }
+/**
+ * 이메일 중복 확인 Mutation 훅
+ */
+export const useEmailCheckMutation = () => {
+  return useMutation({
+    mutationFn: async (email: string) => {
+      const response = await checkEmail({ email });
+      return response;
+    },
+    onError: (error: AxiosError<{ message: string }>) => {
+      console.error(error);
+    },
+  });
+};
 
+/**
+ * 비밀번호 찾기 Mutation 훅
+ */
+export const useForgotPasswordMutation = () => {
+  return useMutation({
+    mutationFn: async (data: any) => {
+      const response = await forgotPassword(data);
+      return response;
+    },
+  });
+};
+
+/**
+ * 비밀번호 재설정 Mutation 훅
+ */
+export const useResetPasswordMutation = () => {
+  return useMutation({
+    mutationFn: async (data: any) => {
+      const response = await resetPassword(data);
+      return response;
+    },
+  });
+};
+
+/**
+ * 구글 로그인 Mutation 훅
+ */
+export const useGoogleLoginMutation = () => {
+  const { storeLogin } = useAuthStore();
+  return useMutation({
+    mutationFn: async (token: string) => {
+      const response = await googleLogin(token);
+      return response;
+    },
+    onSuccess: (data) => {
+      if (data.user && data.accessToken) {
+        storeLogin(data.user.username, data.accessToken);
+      }
+    },
+    onError: (error) => {
+      console.error(error);
+    },
+  });
+};
+
+/**
+ * 소셜 회원가입 Mutation 훅
+ */
+export const useSocialSignupMutation = () => {
+  const { storeLogin } = useAuthStore();
+  return useMutation({
+    mutationFn: async (data: { signupToken: string; nickname: string }) => {
+      const response = await socialSignup(data);
+      return response;
+    },
+    onSuccess: (data: any) => {
+      if (data.user && data.accessToken) {
+        storeLogin(data.user.username, data.accessToken);
+      }
+    },
+  });
 };

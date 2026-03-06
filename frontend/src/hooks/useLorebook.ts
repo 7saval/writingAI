@@ -1,30 +1,27 @@
 import { useEffect, useState } from "react";
 import type { LoreNote } from "@/types/database";
 import { CATEGORY_OPTIONS } from "@/constants/categoryOptions";
-import { fetchProjectContexts, updateContext } from "@/api/projects.api";
+import {
+  useProjectContextsQuery,
+  useUpdateContextMutation,
+} from "@/hooks/useProjects";
 import { showAlert, showConfirm } from "@/store/useDialogStore";
 
 export const useLorebook = (projectId: number) => {
+  const { data: contexts, isLoading: isQueryLoading } =
+    useProjectContextsQuery(projectId);
+  const { mutateAsync: updateContextAsync } = useUpdateContextMutation();
   const [lorebook, setLorebook] = useState<LoreNote[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const isLoading = isQueryLoading;
   const [tagInputs, setTagInputs] = useState<{ [key: string]: string }>({}); // 각 노트별 태그 입력 상태 관리
 
-  // 모달이 열릴 때 데이터 fetch
+  // 모달이 열릴 때 데이터 fetch (캐시 기반 렌더링)
   useEffect(() => {
-    setIsLoading(true);
-    fetchProjectContexts(projectId)
-      .then((contexts) => {
-        setLorebook(contexts.lorebook || []);
-      })
-      .catch((error) => {
-        console.error("Failed to fetch context", error);
-        showAlert("컨텍스트를 불러오는데 실패했습니다.");
-      })
-      .finally(() => {
-        setIsLoading(false);
-      });
-  }, []);
+    if (contexts) {
+      setLorebook(contexts.lorebook || []);
+    }
+  }, [contexts]);
 
   const saveContext = async () => {
     const isConfirmed = await showConfirm(
@@ -35,7 +32,7 @@ export const useLorebook = (projectId: number) => {
 
     try {
       setIsSubmitting(true);
-      await updateContext(projectId, { lorebook });
+      await updateContextAsync({ projectId, data: { lorebook } });
       await showAlert("저장되었습니다.");
     } catch (error) {
       console.error("Failed to save context", error);

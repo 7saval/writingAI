@@ -8,10 +8,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  useSignupMutation,
-  useEmailCheckMutation,
-} from "@/hooks/useAuthMutations";
+import { useSignupMutation, useEmailCheckMutation } from "@/hooks/useAuth";
 import { useForm } from "react-hook-form";
 import { Link, useNavigate } from "react-router-dom";
 import { showAlert } from "@/store/useDialogStore";

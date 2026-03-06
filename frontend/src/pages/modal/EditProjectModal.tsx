@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { updateProject } from "@/api/projects.api";
+import { useUpdateProjectMutation } from "@/hooks/useProjects";
 import { Modal } from "@/components/common/Modal";
 import type { Project } from "@/types/database";
 import { showAlert, showConfirm } from "@/store/useDialogStore";
@@ -21,6 +21,7 @@ export function EditProjectModal({
   const [description, setDescription] = useState("");
   const [genre, setGenre] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { mutateAsync: updateProjectAsync } = useUpdateProjectMutation();
 
   useEffect(() => {
     if (project && open) {
@@ -40,11 +41,14 @@ export function EditProjectModal({
 
     try {
       setIsSubmitting(true);
-      await updateProject(project.id, {
-        ...project,
-        title,
-        description,
-        genre,
+      await updateProjectAsync({
+        projectId: project.id,
+        data: {
+          ...project,
+          title,
+          description,
+          genre,
+        },
       });
 
       onOpenChange(false);

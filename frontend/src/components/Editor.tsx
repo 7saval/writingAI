@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { Paragraph } from "@/types/database";
 import { useParams } from "react-router-dom";
-import { fetchProjectParagraphs } from "@/api/parapraphs.api";
-import { writeParagraph } from "@/api/writing.api";
+import { useProjectParagraphsQuery } from "@/hooks/useParagraphs";
+import { useWriteParagraphMutation } from "@/hooks/useWriting";
 import ParagraphItem from "@/components/ParagraphItem";
 import { showAlert } from "@/store/useDialogStore";
 
@@ -13,13 +13,17 @@ function Editor() {
   const [isLoading, setIsLoading] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  // 초기 데이터 로드
+  const { data: fetchedParagraphs } = useProjectParagraphsQuery(
+    Number(projectId),
+  );
+  const { mutateAsync: writeParagraphAsync } = useWriteParagraphMutation();
+
+  // 초기 데이터 로드 (로컬 state 업데이트 유지 원함)
   useEffect(() => {
-    if (!projectId) return;
-    fetchProjectParagraphs(Number(projectId)).then((paragraphs) => {
-      setParagraphs(paragraphs);
-    });
-  }, [projectId]);
+    if (fetchedParagraphs) {
+      setParagraphs(fetchedParagraphs);
+    }
+  }, [fetchedParagraphs]);
 
   // 단락이 추가될 때마다 스크롤을 최하단으로 이동
   useEffect(() => {
@@ -67,7 +71,10 @@ function Editor() {
 
     try {
       // API 호출
-      const res = await writeParagraph(Number(projectId), userInput);
+      const res = await writeParagraphAsync({
+        projectId: Number(projectId),
+        content: userInput,
+      });
 
       // API 응답을 받으면 임시 단락들을 실제 단락으로 교체 (AI 단락의 isLoading은 false 또는 속성 없음으로 치환됨)
       setParagraphs((prev) =>

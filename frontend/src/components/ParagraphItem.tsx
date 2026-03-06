@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { Paragraph } from "@/types/database";
 import {
-  deleteParagraph,
-  regenerateAiParagraph,
-  updateParagraph,
-} from "@/api/parapraphs.api";
+  useUpdateParagraphMutation,
+  useDeleteParagraphMutation,
+  useRegenerateAiParagraphMutation,
+} from "@/hooks/useParagraphs";
+import { useTypingAnimation } from "@/hooks/useTypingAnimation";
 import { showAlert, showConfirm } from "@/store/useDialogStore";
 
 interface ParagraphItemProps {
@@ -24,35 +25,24 @@ function ParagraphItem({
   const [editContent, setEditContent] = useState(paragraph.content); // 수정 중인 내용
   const [isRegenerating, setIsRegenerating] = useState(false); // 재생성 중 여부
 
-  // 타이핑 애니메이션 관련 상태
-  const [displayedContent, setDisplayedContent] = useState(
-    paragraph.isTyping ? "" : paragraph.content,
+  const { mutateAsync: updateParagraphAsync } = useUpdateParagraphMutation();
+  const { mutateAsync: deleteParagraphAsync } = useDeleteParagraphMutation();
+  const { mutateAsync: regenerateAiParagraphAsync } =
+    useRegenerateAiParagraphMutation();
+
+  // 타이핑 애니메이션 훅 (초기 AI 작성 시 isTyping 플래그를 전달)
+  const { displayedContent, isTyping, playTyping } = useTypingAnimation(
+    paragraph.content,
+    paragraph.isTyping || false,
   );
-  const [isTyping, setIsTyping] = useState(paragraph.isTyping || false);
-
-  useEffect(() => {
-    if (isTyping && paragraph.content) {
-      let i = 0;
-      setDisplayedContent("");
-      const interval = setInterval(() => {
-        setDisplayedContent(paragraph.content.slice(0, i + 1));
-        i++;
-        if (i >= paragraph.content.length) {
-          clearInterval(interval);
-          setIsTyping(false);
-        }
-      }, 30); // 글자당 30ms
-
-      return () => clearInterval(interval);
-    } else if (!isTyping) {
-      setDisplayedContent(paragraph.content);
-    }
-  }, [isTyping, paragraph.content]);
 
   // 수정 저장
   const handleSave = async () => {
     try {
-      await updateParagraph(paragraph.id, { content: editContent });
+      await updateParagraphAsync({
+        paragraphId: paragraph.id,
+        data: { content: editContent },
+      });
       onUpdate(paragraph.id, editContent);
       setIsEditing(false);
     } catch (error) {
@@ -70,7 +60,7 @@ function ParagraphItem({
     if (!isConfirmed) return;
 
     try {
-      await deleteParagraph(paragraph.id);
+      await deleteParagraphAsync(paragraph.id);
       onDelete(paragraph.id);
     } catch (error) {
       console.error("Failed to delete paragraph:", error);
@@ -88,7 +78,11 @@ function ParagraphItem({
 
     setIsRegenerating(true);
     try {
-      const res = await regenerateAiParagraph(paragraph.id);
+      const res = await regenerateAiParagraphAsync({
+        paragraphId: paragraph.id,
+      });
+      // 재생성 완료 후 타이핑 애니메이션 시작
+      playTyping(res.content);
       onRegenerate(paragraph.id, res.content);
     } catch (error) {
       console.error("Failed to regenerate paragraph:", error);

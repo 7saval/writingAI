@@ -1,26 +1,31 @@
-import { useState } from "react"
-import { createProject } from "../../api/projects.api"
-import { Modal } from "../../components/common/Modal";
+import { useState } from "react";
+import { useCreateProjectMutation } from "@/hooks/useProjects";
+import { Modal } from "@/components/common/Modal";
 
 interface NewProjectModalProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  onProjectCreated?: (projectId: string) => void
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onProjectCreated?: (projectId: string) => void;
 }
 
-export function NewProjectModal({ open, onOpenChange, onProjectCreated }: NewProjectModalProps) {
+export function NewProjectModal({
+  open,
+  onOpenChange,
+  onProjectCreated,
+}: NewProjectModalProps) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [genre, setGenre] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { mutateAsync: createProjectAsync } = useCreateProjectMutation();
 
   const handleCreate = async () => {
-    if (!title || !genre) return
+    if (!title || !genre) return;
 
     try {
       setIsSubmitting(true);
       // @ts-ignore - API expects Project but we send partial
-      const newProject = await createProject({
+      const newProject = await createProjectAsync({
         title,
         genre,
         synopsis: "",
@@ -28,17 +33,17 @@ export function NewProjectModal({ open, onOpenChange, onProjectCreated }: NewPro
         lorebook: [],
       });
 
-      setTitle("")
-      setDescription("")
-      setGenre("")
-      onOpenChange(false)
-      onProjectCreated?.(String(newProject.id))
+      setTitle("");
+      setDescription("");
+      setGenre("");
+      onOpenChange(false);
+      onProjectCreated?.(String(newProject.id));
     } catch (error) {
       console.error("Failed to create project", error);
     } finally {
       setIsSubmitting(false);
     }
-  }
+  };
 
   return (
     <Modal
@@ -66,7 +71,9 @@ export function NewProjectModal({ open, onOpenChange, onProjectCreated }: NewPro
     >
       <div className="space-y-4">
         <div className="space-y-2">
-          <label htmlFor="title" className="text-sm font-medium text-slate-700">제목</label>
+          <label htmlFor="title" className="text-sm font-medium text-slate-700">
+            제목
+          </label>
           <input
             id="title"
             type="text"
@@ -78,7 +85,12 @@ export function NewProjectModal({ open, onOpenChange, onProjectCreated }: NewPro
         </div>
 
         <div className="space-y-2">
-          <label htmlFor="description" className="text-sm font-medium text-slate-700">설명</label>
+          <label
+            htmlFor="description"
+            className="text-sm font-medium text-slate-700"
+          >
+            설명
+          </label>
           <textarea
             id="description"
             value={description}
@@ -89,14 +101,18 @@ export function NewProjectModal({ open, onOpenChange, onProjectCreated }: NewPro
         </div>
 
         <div className="space-y-2">
-          <label htmlFor="genre" className="text-sm font-medium text-slate-700">장르</label>
+          <label htmlFor="genre" className="text-sm font-medium text-slate-700">
+            장르
+          </label>
           <select
             id="genre"
             value={genre}
             onChange={(e) => setGenre(e.target.value)}
             className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
           >
-            <option value="" disabled>장르를 선택하세요</option>
+            <option value="" disabled>
+              장르를 선택하세요
+            </option>
             <option value="판타지">판타지</option>
             <option value="SF">SF</option>
             <option value="로맨스">로맨스</option>
@@ -109,5 +125,5 @@ export function NewProjectModal({ open, onOpenChange, onProjectCreated }: NewPro
         </div>
       </div>
     </Modal>
-  )
+  );
 }

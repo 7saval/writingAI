@@ -161,6 +161,135 @@ element.scrollTop = element.scrollHeight;
 
 #### 📊 진행률
 
-Week 7: ████████████░░ 91%
+Week 7: ████████████░░ 92%
+
+---
+
+### 📅 2026-03-06 (Day 29)
+
+#### 🎯 오늘의 목표
+
+- [x] 리액트 쿼리 사용
+- [ ] 태그한 키워드에 대해서만 AI 학습 범위 주도록 구현
+- [ ] 사용자정의 프롬프트 구현
+- [ ] 작성 글 내보내기
+- [ ] 크롬 익스텐션 / 일렉트론 앱
+- [ ] 모바일 반응형 및 웹 앱 적용
+- [ ] 다크테마
+
+#### ✅ 완료한 작업
+
+- ✅ 모든 API에 React Query 커스텀 훅 적용 (도메인별 파일로 통합)
+- ✅ 컴포넌트 전체에서 API 직접 호출 제거, 훅 사용으로 전환
+- ✅ 타이핑 애니메이션 공통 훅(`useTypingAnimation`) 추출 및 AI 재생성에도 적용
+
+#### 🔧 해결한 문제
+
+**React Query 커스텀 훅 도입 및 코드베이스 마이그레이션**
+
+- 🎯 **문제 정의**: 프로젝트 각 페이지와 컴포넌트에서 API 함수를 직접 `import`해 `useState` + `try/catch`로 직접 호출하는 방식이었음. 로딩 상태, 에러 처리, 캐시 무효화 등 반복되는 패턴이 분산되어 있어 유지보수가 어려웠음.
+
+- � **해결 방향**: 모든 API를 React Query 기반의 커스텀 훅으로 래핑(wrapping)하고, 도메인별로 파일을 분리하여 관심사 분리(Separation of Concerns)를 강화.
+
+- 🏗 **네이밍 규칙 의사결정**
+  - 조회(GET): `use[Domain]Query` (예: `useProjectsQuery`)
+  - 변경(POST/PUT/DELETE): `use[Action][Domain]Mutation` (예: `useCreateProjectMutation`)
+  - `fetch` vs `get` 접두사 논쟁 중 `Query` 접미사를 붙이는 규칙을 선택한 이유: React Query 자체가 내부적으로 캐시를 관리하여 네트워크 요청뿐 아니라 캐시 데이터도 반환하기 때문에, 단순 네트워크 요청임을 암시하는 `fetch`보다 "데이터를 조회한다"는 의도가 명확한 `Query` 접미사가 더 적합하다고 판단.
+
+- 📁 **도메인별 파일 구조**
+
+  ```
+  hooks/
+  ├── useAuth.ts         ← 인증 관련 (기존 파일 3개 → 1개로 통합)
+  ├── useProjects.ts     ← 프로젝트 CRUD
+  ├── useParagraphs.ts   ← 단락 CRUD + AI 재생성
+  └── useWriting.ts      ← AI 글쓰기(단락 작성)
+  ```
+
+  기존에 `useAuthMutations.ts`, `useAuthQuery.ts`, `useAuth.ts`로 흩어져 있던 인증 훅을 `useAuth.ts` 하나로 통합하고, 나머지 도메인도 동일한 방식으로 정리.
+
+- ✅ **캐시 무효화(invalidateQueries)**: Mutation 성공 시 관련된 Query 캐시를 자동으로 무효화. 예를 들어 프로젝트 삭제(Mutation) 성공 시 `projects list` 캐시가 무효화되어 목록이 자동으로 리패치됨. 기존에는 삭제 후 수동으로 `fetchProjects()`를 다시 호출해야 했음.
+
+---
+
+**타이핑 애니메이션 공통 훅 분리 (`useTypingAnimation`)**
+
+- 🎯 **문제 정의**: AI 최초 작성 시에는 타이핑 애니메이션이 적용되었지만, 🔄 AI 재생성 시에는 결과가 즉시 교체(Replace)되어 애니메이션이 없었음. 기존 애니메이션 로직은 `ParagraphItem` 컴포넌트 내부에 `useState` + `useEffect`로 인라인(inline)으로 작성되어 있었음.
+
+- 🤔 **접근 방법 비교**
+  - **방법 1 (내부 직접 제어)**: `handleRegenerate`에서 응답을 받은 뒤 바로 `setIsTyping(true)`를 호출. 수정 범위가 2~3줄로 최소화되지만, 기존 초기 작성과 재생성이 다른 방식으로 트리거되어 코드 중복과 불일치가 생김.
+  - **방법 2 (공통 훅 분리)**: 타이핑 애니메이션 로직을 `useTypingAnimation` 훅으로 추출. 재사용성과 유지보수성이 높아지지만 초기 리팩토링 비용이 있음.
+  - **선택**: 방법 2. 현재는 사용처가 하나지만, 애니메이션 속도 변경이나 다른 컴포넌트 재사용 시 수정 포인트가 하나가 되어 장기적으로 유리.
+
+- 💡 **훅 설계 포인트**
+  - `playTyping(newContent)` 함수를 외부로 노출해, 새 텍스트로 타이핑 애니메이션을 언제든지 트리거할 수 있게 설계.
+  - `speed` 파라미터로 타이핑 속도를 런타임에 주입 가능 (기본 30ms/글자).
+  - `useEffect` 클린업 함수(`return () => clearInterval`)로 컴포넌트 언마운트 시 메모리 누수 방지.
+
+  ```ts
+  // 훅 사용 예시
+  const { displayedContent, isTyping, playTyping } = useTypingAnimation(
+    paragraph.content,
+    paragraph.isTyping || false, // 마운트 시 즉시 시작 여부
+  );
+
+  // AI 재생성 완료 시
+  const res = await regenerateAiParagraphAsync({ paragraphId: paragraph.id });
+  playTyping(res.content); // ← 이 한 줄로 타이핑 애니메이션 트리거
+  ```
+
+- 📁 **훅 vs 유틸 폴더 결정**: `useTypingAnimation`은 내부적으로 `useState`와 `useEffect`를 사용하는 React 훅이므로 `hooks/` 폴더에 배치. `utils/`는 React에 의존하지 않는 순수 자바스크립트 함수 전용.
+
+#### 🚨 이슈/트러블슈팅/질문
+
+-
+
+#### 📌 디벨롭 사항
+
+- [x] 리액트 쿼리 사용
+- [ ] 태그한 키워드에 대해서만 AI 학습 범위 주도록 구현
+- [ ] 사용자정의 프롬프트 구현
+- [ ] 백엔드 에러 핸들링 개선
+- [ ] 작성 글 내보내기
+- [ ] 크롬 익스텐션 / 일렉트론 앱
+- [ ] 모바일 반응형 및 웹 앱 적용
+- [ ] 다크테마
+
+#### 💡 개념 정리
+
+**`utils/` vs `hooks/` 폴더, 무엇이 다른가?**
+
+| 구분         | `hooks/`                                   | `utils/`                        |
+| ------------ | ------------------------------------------ | ------------------------------- |
+| 역할         | React 훅 (`useState`, `useEffect` 등 사용) | 순수 JS/TS 함수                 |
+| 접두사       | `use` 필수 (React 훅 컨벤션)               | 자유                            |
+| React 의존성 | 있음                                       | 없음                            |
+| 예시         | `useTypingAnimation`, `useDebounce`        | `formatDate`, `cn`, `calcPrice` |
+
+**React Query의 캐시 무효화(`invalidateQueries`)란?**
+
+React Query는 서버에서 가져온 데이터를 내부 캐시에 저장(캐싱)한다. Mutation(데이터 변경)이 성공했을 때, 관련 Query의 캐시를 "오래됨(stale)" 처리하면 다음 번에 해당 데이터를 조회할 때 서버에서 새로 불러온다. `invalidateQueries`가 바로 그 역할이다.
+
+```ts
+onSuccess: () => {
+  // 'projects list' 캐시를 무효화 → 자동으로 목록 리패치
+  queryClient.invalidateQueries({ queryKey: projectKeys.lists() });
+};
+```
+
+기존에는 삭제 API 호출 후 수동으로 `fetchProjects()`를 다시 호출했지만, Mutation의 `onSuccess`에 `invalidateQueries`를 걸어두면 React Query가 자동으로 처리해준다.
+
+**커스텀 훅의 단일 책임 원칙**
+
+하나의 커스텀 훅은 하나의 관심사(역할)만 담당하도록 설계하는 것이 좋다. 이번에 `useTypingAnimation`을 분리한 이유가 바로 이것이다. 타이핑 애니메이션 "실행"과 그 결과를 "표시"하는 관심사를 `ParagraphItem`에서 분리함으로써, 훅은 재사용이 가능하고 컴포넌트는 더 단순해졌다.
+
+#### 📝 피드백 내용
+
+- database.ts
+  - 타입 형식 : 카멜 - 스네이크 맞추기
+
+#### 📊 진행률
+
+Week 7: ██████████████ 97%
 
 ---

@@ -8,10 +8,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  useLoginMutation,
-  useGoogleLoginMutation,
-} from "@/hooks/useAuthMutations";
+import { useLoginMutation, useGoogleLoginMutation } from "@/hooks/useAuth";
 import { useForm } from "react-hook-form";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useToast } from "@/hooks/useToast";

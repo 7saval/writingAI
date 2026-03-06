@@ -1,10 +1,13 @@
-import { useEffect, useState, useCallback } from "react";
-import type { Project } from "../types/database";
-import { deleteProject, fetchProjects } from "../api/projects.api";
+import { useState } from "react";
+import type { Project } from "@/types/database";
+import {
+  useProjectsQuery,
+  useDeleteProjectMutation,
+} from "@/hooks/useProjects";
 import { Link, useNavigate } from "react-router-dom";
-import { NewProjectModal } from "../pages/modal/NewProjectModal";
-import { EditProjectModal } from "../pages/modal/EditProjectModal";
-import { showAlert, showConfirm } from "../store/useDialogStore";
+import { NewProjectModal } from "@/pages/modal/NewProjectModal";
+import { EditProjectModal } from "@/pages/modal/EditProjectModal";
+import { showAlert, showConfirm } from "@/store/useDialogStore";
 
 interface Props {
   // onNewProject는 이제 내부에서 처리하므로 선택적 prop으로 변경하거나 제거할 수 있지만,
@@ -15,23 +18,14 @@ interface Props {
 }
 
 export function ProjectSidebar({ projectId }: Props) {
-  const [projects, setProjects] = useState<Project[]>([]);
+  const { data: projects = [] } = useProjectsQuery();
+  const { mutateAsync: deleteProjectAsync } = useDeleteProjectMutation();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const navigate = useNavigate();
 
-  const loadProjects = useCallback(() => {
-    fetchProjects().then(setProjects).catch(console.error);
-  }, []);
-
-  // 컴포넌트 마운트 시 프로젝트 목록 불러오기
-  useEffect(() => {
-    loadProjects();
-  }, [loadProjects]);
-
   // 프로젝트 생성
   const handleCreateProject = (newProjectId: string) => {
-    loadProjects();
     // 새로 생성된 프로젝트로 이동하여 isActive 상태로 만들기
     navigate(`/projects/${newProjectId}/paragraphs`);
   };
@@ -55,9 +49,8 @@ export function ProjectSidebar({ projectId }: Props) {
     );
     if (!isConfirmed) return;
 
-    deleteProject(id)
+    deleteProjectAsync(id)
       .then(() => {
-        loadProjects();
         // 만약 삭제한 프로젝트가 현재 활성화된 프로젝트라면 메인으로 이동
         if (String(id) === projectId) {
           // 프로젝트 화면 이동
@@ -163,7 +156,6 @@ export function ProjectSidebar({ projectId }: Props) {
           project={editingProject}
           onOpenChange={(open) => !open && setEditingProject(null)}
           onProjectUpdated={() => {
-            loadProjects();
             setEditingProject(null);
           }}
         />
