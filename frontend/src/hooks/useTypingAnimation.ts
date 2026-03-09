@@ -21,7 +21,19 @@ export const useTypingAnimation = (
   // 애니메이션의 대상이 되는 전체 텍스트
   const [targetContent, setTargetContent] = useState(initialContent);
 
-  // isTyping이 true로 바뀌면 타이핑 애니메이션 실행
+  // 렌더링 단계에서 프로프 동기화 (Render-phase state update)
+  // 외부(부모)에서 initialContent가 변경되면 내부 상태를 즉시 동기화합니다.
+  const [prevInitialContent, setPrevInitialContent] = useState(initialContent);
+  if (initialContent !== prevInitialContent) {
+    setPrevInitialContent(initialContent);
+    setTargetContent(initialContent);
+    // 타이핑 중이 아닐 때만 화면 내용을 즉시 업데이트
+    if (!isTyping) {
+      setDisplayedContent(initialContent);
+    }
+  }
+
+  // 타이핑 애니메이션 실행 (애니메이션이 시작될 때만 동작)
   useEffect(() => {
     if (!isTyping || !targetContent) return;
 
@@ -39,13 +51,6 @@ export const useTypingAnimation = (
 
     return () => clearInterval(interval);
   }, [isTyping, targetContent, speed]);
-
-  // isTyping이 false일 때 targetContent가 바뀌면 즉시 반영
-  useEffect(() => {
-    if (!isTyping) {
-      setDisplayedContent(targetContent);
-    }
-  }, [isTyping, targetContent]);
 
   /**
    * 새로운 텍스트로 타이핑 애니메이션을 시작합니다.

@@ -10,5 +10,6 @@
     "emitDecoratorMetadata": true,
     "skipLibCheck": true,
     "sourceMap": true
-  }
+  },
+  "exclude": ["node_modules", "tests"]
 }
