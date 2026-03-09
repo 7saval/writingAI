@@ -1,3 +1,11 @@
+export interface SynopsisState {
+  introduction: string; // 발단
+  development: string; // 전개
+  crisis: string; // 위기
+  climax: string; // 절정
+  conclusion: string; // 결말
+}
+
 export interface Project {
   id: number;
   user_id: number;

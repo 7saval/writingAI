@@ -4,19 +4,43 @@ import {
   useUpdateContextMutation,
 } from "@/hooks/useProjects";
 import { showAlert, showConfirm } from "@/store/useDialogStore";
+import type { SynopsisState } from "@/types/database";
+
+const initialSynopsisState: SynopsisState = {
+  introduction: "",
+  development: "",
+  crisis: "",
+  climax: "",
+  conclusion: "",
+};
 
 export const useSynopsis = (projectId: number) => {
   const { data: contexts, isLoading: isQueryLoading } =
     useProjectContextsQuery(projectId);
   const { mutateAsync: updateContextAsync } = useUpdateContextMutation();
-  const [synopsis, setSynopsis] = useState("");
+  const [synopsis, setSynopsis] = useState<SynopsisState>(initialSynopsisState);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isLoading = isQueryLoading;
 
   // 모달이 열릴 때 데이터 fetch (캐시 기반 렌더링)
   useEffect(() => {
-    if (contexts) {
-      setSynopsis(contexts.synopsis || "");
+    if (contexts && contexts.synopsis) {
+      try {
+        // JSON 파싱 시도
+        const parsed = JSON.parse(contexts.synopsis);
+        if (typeof parsed === "object" && parsed !== null) {
+          setSynopsis({
+            ...initialSynopsisState,
+            ...parsed,
+          });
+        }
+      } catch (e) {
+        // JSON이 아닐 경우(기존 데이터) '발단'에 몰아넣기
+        setSynopsis({
+          ...initialSynopsisState,
+          introduction: contexts.synopsis,
+        });
+      }
     }
   }, [contexts]);
 
@@ -29,7 +53,11 @@ export const useSynopsis = (projectId: number) => {
 
     try {
       setIsSubmitting(true);
-      await updateContextAsync({ projectId, data: { synopsis } });
+      // 객체를 JSON 문자열로 변환하여 저장
+      await updateContextAsync({
+        projectId,
+        data: { synopsis: JSON.stringify(synopsis) },
+      });
       await showAlert("저장되었습니다.");
     } catch (error) {
       console.error("Failed to save context", error);
@@ -39,8 +67,11 @@ export const useSynopsis = (projectId: number) => {
     }
   };
 
-  const updateSynopsis = (value: string) => {
-    setSynopsis(value);
+  const updateSynopsisPart = (part: keyof SynopsisState, value: string) => {
+    setSynopsis((prev) => ({
+      ...prev,
+      [part]: value,
+    }));
   };
 
   return {
@@ -48,6 +79,6 @@ export const useSynopsis = (projectId: number) => {
     isSubmitting,
     isLoading,
     saveContext,
-    updateSynopsis,
+    updateSynopsisPart,
   };
 };

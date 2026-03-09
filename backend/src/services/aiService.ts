@@ -9,8 +9,10 @@ const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const BASE_PROMPT = `당신은 소설 작법 전문가입니다. 
 1. 반드시 한국어로 답변하세요.
-2. 단순한 상황 설명이나 묘사에 그치지 말고, 등장인물의 구체적인 행동이나 개연성 있는 사건을 단락마다 하나 이상 포함하세요.
-3. 이전 문맥(본문)과 설정집(Lorebook)의 내용을 엄격히 준수하세요.`;
+2. 단순한 상황 설명이나 묘사를 장황하게 늘어놓는 것을 지양하세요.
+3. 지나치게 감상적이고 감정적인 호소를 하지마세요.
+4. 등장인물의 구체적인 행동이나 개연성 있는 사건을 단락마다 하나 이상 포함하세요.
+5. 이전 문맥(본문)과 설정집(Lorebook)의 내용을 엄격히 준수하세요.`;
 
 export interface ContextOptions {
   includeSynopsis: boolean;
@@ -18,6 +20,7 @@ export interface ContextOptions {
   includeDescription: boolean;
   maxParagraphs: number;
   loreFocusTags?: string[];
+  stage?: string;
 }
 
 // AI 생성 옵션 인터페이스
@@ -30,13 +33,14 @@ interface GenerationOptions {
 export async function generateNextParagraph(
   project: Project,
   paragraphs: Paragraph[],
-  options?: GenerationOptions & { prompt?: string },
+  options?: GenerationOptions & { prompt?: string; stage?: string },
 ) {
   const messages = buildContext(project, paragraphs, {
     includeSynopsis: true,
     includeLorebook: true,
     includeDescription: true,
     maxParagraphs: 10,
+    stage: options?.stage,
   });
 
   const genrePrompts: Record<string, string> = {
@@ -97,7 +101,38 @@ export function buildContext(
 
   let headerContext = "";
   if (options.includeSynopsis && project.synopsis) {
-    headerContext += `[Synopsis]\n${project.synopsis}\n\n`;
+    let synopsisText = project.synopsis;
+    let stageGuide = "";
+
+    try {
+      // 5단계 시놉시스 JSON 파싱 시도
+      const synopsisObj = JSON.parse(project.synopsis);
+      const stageMap: Record<string, string> = {
+        발단: "introduction",
+        전개: "development",
+        위기: "crisis",
+        절정: "climax",
+        결말: "conclusion",
+      };
+
+      const stageKey = options.stage ? stageMap[options.stage] : null;
+
+      if (stageKey && synopsisObj[stageKey]) {
+        // 현재 단계의 시놉시스를 강조하여 전달
+        synopsisText = `[전체 개요]\n${Object.values(synopsisObj).join("\n")}\n\n[현재 집중 단계: ${options.stage}]\n${synopsisObj[stageKey]}`;
+        stageGuide = `\n현재 이야기는 소설의 5단 구성 중 [${options.stage}] 단계에 해당합니다. 해당 단계의 시놉시스 내용을 중점적으로 반영하여 이야기를 전개해 주세요.`;
+      } else {
+        // 단계를 특정할 수 없거나 해당 내용이 없을 경우 전체 출력
+        synopsisText = Object.entries(synopsisObj)
+          .map(([key, value]) => `- ${key}: ${value}`)
+          .join("\n");
+      }
+    } catch (e) {
+      // 일반 텍스트인 경우 그대로 사용
+      synopsisText = project.synopsis;
+    }
+
+    headerContext += `[Synopsis]\n${synopsisText}${stageGuide}\n\n`;
   }
   if (options.includeLorebook && project.lorebook) {
     const notes = project.lorebook;

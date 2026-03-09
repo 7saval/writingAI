@@ -5,10 +5,12 @@ export const writeParagraph = async (
   projectId: number,
   content: string,
   prompt?: string,
+  stage?: string,
 ) => {
   const response = await apiClient.post(`/writing/${projectId}/write`, {
     content,
     prompt,
+    stage,
   });
   return response.data;
 };

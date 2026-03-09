@@ -1,0 +1,3 @@
+import type { StoryStage } from "@/store/useWritingStore";
+
+export const STAGES: StoryStage[] = ["발단", "전개", "위기", "절정", "결말"];
