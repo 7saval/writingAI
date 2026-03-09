@@ -8,6 +8,7 @@ import {
   googleLogin,
   socialSignup,
   verifyUser,
+  refresh,
 } from "@/api/auth.api";
 import type { LoginProps } from "@/pages/auth/Login";
 import type { SignupProps } from "@/pages/auth/Signup";
@@ -32,9 +33,31 @@ export const useAuthUserQuery = () => {
       try {
         const response = await verifyUser();
         if (response.authenticated) {
-          storeLogin(response.user.username, response.accessToken);
+          // verifyUser는 토큰을 반환하지 않으므로 기존 스토어의 토큰 유지
+          const currentToken = useAuthStore.getState().accessToken;
+          storeLogin(response.user.username, currentToken || "");
           return response;
         }
+
+        // 인증 루프 방지를 위해 refresh 시도
+        try {
+          const refreshData = await refresh();
+          if (refreshData.accessToken) {
+            // 1. 재시도 전 스토어 업데이트 (apiClient의 request interceptor에서 사용)
+            useAuthStore.getState().setAccessToken(refreshData.accessToken);
+
+            // 2. refresh 성공 후 다시 유저 정보 확인
+            const retryResponse = await verifyUser();
+            if (retryResponse.authenticated) {
+              // 3. 얻은 토큰을 포함하여 로그인 상태 완료
+              storeLogin(retryResponse.user.username, refreshData.accessToken);
+              return retryResponse;
+            }
+          }
+        } catch (refreshError) {
+          // refresh 실패 시 조용히 처리 (로그아웃으로 이어짐)
+        }
+
         storeLogout();
         return null;
       } catch (error) {
