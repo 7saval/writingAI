@@ -12,10 +12,12 @@ export const useWriteParagraphMutation = () => {
     mutationFn: ({
       projectId,
       content,
+      prompt,
     }: {
       projectId: number;
       content: string;
-    }) => writeParagraph(projectId, content),
+      prompt?: string;
+    }) => writeParagraph(projectId, content, prompt),
     onSuccess: (_, variables) => {
       // 단락이 새로 작성되었으므로 해당 프로젝트의 단락 목록 캐시 무효화
       queryClient.invalidateQueries({

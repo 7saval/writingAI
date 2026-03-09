@@ -5,6 +5,7 @@ import { useProjectParagraphsQuery } from "@/hooks/useParagraphs";
 import { useWriteParagraphMutation } from "@/hooks/useWriting";
 import ParagraphItem from "@/components/ParagraphItem";
 import { showAlert } from "@/store/useDialogStore";
+import { useWritingStore } from "@/store/useWritingStore";
 
 function Editor() {
   const { projectId } = useParams(); // URL에서 projectId 가져오기
@@ -12,6 +13,8 @@ function Editor() {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  const { aiDirective, resetAiDirective } = useWritingStore();
 
   const { data: fetchedParagraphs } = useProjectParagraphsQuery(
     Number(projectId),
@@ -38,7 +41,9 @@ function Editor() {
     if (!input.trim() || !projectId) return;
 
     const userInput = input;
+    const currentDirective = aiDirective;
     setInput(""); // 입력창 즉시 초기화
+    resetAiDirective(); // 지시사항도 초기화
 
     // 임시 ID (서버 DB와 충돌하지 않도록 음수나 현재 시간 사용)
     const tempUserId = -Date.now();
@@ -74,6 +79,7 @@ function Editor() {
       const res = await writeParagraphAsync({
         projectId: Number(projectId),
         content: userInput,
+        prompt: currentDirective || undefined, // 지시사항 전달
       });
 
       // API 응답을 받으면 임시 단락들을 실제 단락으로 교체 (AI 단락의 isLoading은 false 또는 속성 없음으로 치환됨)
@@ -91,6 +97,7 @@ function Editor() {
         prev.filter((p) => p.id !== tempUserId && p.id !== tempAiId),
       );
       setInput(userInput);
+      // 에러 시 지시사항 복구 고민할 수 있으나 유저가 다시 쓰게 하는게 안전
       await showAlert("단락 작성에 실패했습니다. 다시 시도해주세요.");
     } finally {
       setIsLoading(false);

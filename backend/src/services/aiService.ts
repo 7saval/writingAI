@@ -7,7 +7,12 @@ dotenv.config();
 
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-interface ContextOptions {
+const BASE_PROMPT = `당신은 소설 작법 전문가입니다. 
+1. 반드시 한국어로 답변하세요.
+2. 단순한 상황 설명이나 묘사에 그치지 말고, 등장인물의 구체적인 행동이나 개연성 있는 사건을 단락마다 하나 이상 포함하세요.
+3. 이전 문맥(본문)과 설정집(Lorebook)의 내용을 엄격히 준수하세요.`;
+
+export interface ContextOptions {
   includeSynopsis: boolean;
   includeLorebook: boolean;
   includeDescription: boolean;
@@ -25,95 +30,74 @@ interface GenerationOptions {
 export async function generateNextParagraph(
   project: Project,
   paragraphs: Paragraph[],
-  options?: GenerationOptions,
+  options?: GenerationOptions & { prompt?: string },
 ) {
-  const prompt = buildContext(project, paragraphs, {
+  const messages = buildContext(project, paragraphs, {
     includeSynopsis: true,
     includeLorebook: true,
     includeDescription: true,
-    maxParagraphs: 5, // 최근 5개 단락만 참조
+    maxParagraphs: 10,
   });
 
   const genrePrompts: Record<string, string> = {
-    판타지: `You are a Korean-language fantasy novel writing assistant. 
-                Produce vivid, atmospheric descriptions, rich world-building, and immersive magical elements. 
-                Maintain internal logic for magic systems, geography, and character motivations. 
-                Use expressive but not archaic Korean prose suitable for modern epic fantasy.
-                Avoid clichés and unnecessary exposition. 
-                Always respond in Korean.`,
-
-    로맨스: `You are a Korean-language romance novel writing assistant. 
-                Focus on emotional nuance, character chemistry, unspoken tension, and internal conflict. 
-                Use warm, intimate, expressive Korean prose that highlights feelings over events. 
-                Avoid melodrama and forced clichés. 
-                Always respond in Korean.
-                `,
-    미스터리: `You are a Korean-language mystery novel writing assistant. 
-                Maintain suspense, subtle clue placement, and logical plot progression. 
-                Use concise, atmospheric Korean prose that emphasizes curiosity and tension. 
-                Do not reveal solutions prematurely. 
-                Always respond in Korean.
-                `,
-    스릴러: `You are a Korean-language thriller novel writing assistant. 
-                Emphasize tension, pace, and psychological pressure. 
-                Use tight, cinematic Korean prose with fast rhythm and escalating stakes. 
-                Avoid unnecessary exposition; keep scenes active and gripping. 
-                Always respond in Korean.
-                `,
-
-    SF: `You are a Korean-language science fiction novel writing assistant. 
-                Use sharp, clean prose with grounded scientific plausibility. 
-                Depict technology, societies, and future environments with coherent logic. 
-                Tone should be intelligent, slightly cool, and cinematic. 
-                Avoid technobabble without explanation. 
-                Always respond in Korean.
-                `,
-
-    호러: `You are a Korean-language horror novel writing assistant. 
-                Prioritize dread, atmosphere, sensory discomfort, and slow-burning fear. 
-                Use eerie, intimate Korean prose that evokes the uncanny without relying solely on gore. 
-                Maintain psychological realism and avoid predictable scare patterns. 
-                Always respond in Korean.
-                `,
-    드라마: `You are a Korean-language drama novel writing assistant. 
-                Focus on relationships, emotional growth, conflicts, and personal stakes. 
-                Use grounded, expressive Korean prose with strong character introspection. 
-                Prioritize realism, subtle gestures, and emotional authenticity. 
-                Always respond in Korean.
-                `,
-    기타: `You are a Korean-language creative writing assistant for novels of any genre. 
-                Adapt your tone, pacing, and style according to the user’s intent. 
-                Maintain coherent narrative logic, emotional depth, and consistent characterization. 
-                Use natural and vivid Korean prose suitable for modern storytelling. 
-                Always respond in Korean.
-                `,
+    판타지: `You are a Korean-language fantasy novel writing assistant. Produce vivid, atmospheric descriptions, rich world-building, and immersive magical elements. Maintain internal logic for magic systems, geography, and character motivations.`,
+    로맨스: `You are a Korean-language romance novel writing assistant. Focus on emotional nuance, character chemistry, unspoken tension, and internal conflict.`,
+    미스터리: `You are a Korean-language mystery novel writing assistant. Maintain suspense, subtle clue placement, and logical plot progression.`,
+    스릴러: `You are a Korean-language thriller novel writing assistant. Emphasize tension, pace, and psychological pressure.`,
+    SF: `You are a Korean-language science fiction novel writing assistant. Use sharp, clean prose with grounded scientific plausibility.`,
+    호러: `You are a Korean-language horror novel writing assistant. Prioritize dread, atmosphere, sensory discomfort, and slow-burning fear.`,
+    드라마: `You are a Korean-language drama novel writing assistant. Focus on relationships, emotional growth, conflicts, and personal stakes.`,
+    기타: `You are a Korean-language creative writing assistant for novels of any genre. Adapt your tone, pacing, and style according to the user’s intent.`,
   };
 
-  let systemPrompts = genrePrompts[project.genre || "기타"];
+  const genrePrompt = genrePrompts[project.genre || "기타"];
+
+  // System 메시지 결합
+  const systemMessage: OpenAI.Chat.ChatCompletionMessageParam = {
+    role: "system",
+    content: `${BASE_PROMPT}\n\n[Genre Specific Guide]\n${genrePrompt}`,
+  };
+
+  // 대화 흐름 구성: [System, ...ContextMessages]
+  const finalMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+    systemMessage,
+    ...messages,
+  ];
+
+  // 사용자 방향 지시사항이 있는 경우 마지막에 추가
+  if (options?.prompt) {
+    finalMessages.push({
+      role: "user",
+      content: `[사용자 지시사항]\n${options.prompt}\n\n위 지시사항을 반영하여 다음 단락을 이어서 작성해 주세요.`,
+    });
+  } else {
+    finalMessages.push({
+      role: "user",
+      content: "AI, 다음 단락을 작성해 주세요.",
+    });
+  }
 
   const response = await client.chat.completions.create({
     model: "gpt-4o-mini",
-    messages: [
-      { role: "system", content: systemPrompts },
-      { role: "user", content: prompt },
-    ],
-    temperature: options?.temperature ?? 0.8, // 창의성 (기본값: 0.8)
-    max_tokens: options?.maxTokens ?? 500, // 출력 길이 제한 (기본값: 500)
+    messages: finalMessages,
+    temperature: options?.temperature ?? 0.8,
+    max_tokens: options?.maxTokens ?? 500,
   });
 
   return response.choices[0].message.content;
 }
 
 // 프로젝트 컨텍스트 생성
-function buildContext(
+export function buildContext(
   project: Project,
   paragraphs: Paragraph[],
   options: ContextOptions,
-) {
-  let context = "";
+): OpenAI.Chat.ChatCompletionMessageParam[] {
+  const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
 
+  let headerContext = "";
   if (options.includeSynopsis && project.synopsis) {
-    context += `[Synopsis]\n${project.synopsis}\n\n`;
+    headerContext += `[Synopsis]\n${project.synopsis}\n\n`;
   }
   if (options.includeLorebook && project.lorebook) {
     const notes = project.lorebook;
@@ -128,20 +112,32 @@ function buildContext(
 
     // 본문에 언급된 태그 필터링
     const mentionedTags = allTags.filter((tag) => fullContent.includes(tag));
-
-    context += `[Lorebook]\n${formatLore(notes, mentionedTags.length > 0 ? mentionedTags : undefined)}\n\n`;
+    headerContext += `[Lorebook]\n${formatLore(notes, mentionedTags.length > 0 ? mentionedTags : undefined)}\n\n`;
   }
   if (options.includeDescription && project.description) {
-    context += `[Background]\n${project.description}\n\n`;
+    headerContext += `[Background]\n${project.description}\n\n`;
   }
 
-  const recent = paragraphs
-    .slice(-options.maxParagraphs)
-    .map((p) => `${p.writtenBy.toUpperCase()}: ${p.content}`);
-  context += recent.join("\n\n");
+  // 상단 컨텍스트(시놉시스 등)는 첫 번째 user 메시지에 포함
+  if (headerContext) {
+    messages.push({
+      role: "user",
+      content: headerContext,
+    });
+  }
 
-  context += "\n\nAI, 다음 단락을 작성해 주세요.";
-  return context;
+  // 본문 단락들을 user/assistant 역할로 매핑
+  const recentParagraphs = paragraphs.slice(-options.maxParagraphs);
+  recentParagraphs.forEach((p) => {
+    messages.push({
+      role: (p.writtenBy === "ai" ? "assistant" : "user") as
+        | "assistant"
+        | "user",
+      content: p.content || "",
+    });
+  });
+
+  return messages;
 }
 
 // 설정집 포맷팅 (태그 필터링 포함)
