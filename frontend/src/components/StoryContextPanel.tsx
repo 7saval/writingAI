@@ -13,7 +13,7 @@ export function StoryContextPanel({ projectId }: { projectId: number }) {
 
   return (
     <>
-      <aside className="flex h-full flex-col border-l border-border bg-white p-6 justify-between overflow-y-auto custom-scrollbar">
+      <div className="flex h-full flex-col bg-white p-6 justify-between overflow-y-auto custom-scrollbar">
         <div className="flex flex-col">
           <header className="mb-6 flex items-center justify-between">
             <h2 className="text-xl font-bold text-slate-900 font-outfit">
@@ -97,7 +97,7 @@ export function StoryContextPanel({ projectId }: { projectId: number }) {
             </p>
           </div>
         ) : null}
-      </aside>
+      </div>
       {isSynopModalOpen && (
         <SynopsisModal
           projectId={projectId}

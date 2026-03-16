@@ -10,10 +10,6 @@ import { EditProjectModal } from "@/pages/modal/EditProjectModal";
 import { showAlert, showConfirm } from "@/store/useDialogStore";
 
 interface Props {
-  // onNewProject는 이제 내부에서 처리하므로 선택적 prop으로 변경하거나 제거할 수 있지만,
-  // 외부에서 주입받는 동작을 유지하려면 남겨둡니다.
-  // 여기서는 내부 모달을 사용하도록 변경합니다.
-  onNewProject?: () => void;
   projectId?: string;
 }
 
@@ -65,7 +61,7 @@ export function ProjectSidebar({ projectId }: Props) {
 
   return (
     <>
-      <aside className="flex h-full flex-col border-r border-slate-200 bg-slate-50">
+      <div className="flex h-full flex-col bg-slate-50">
         <div className="flex items-center justify-between p-4">
           <h1 className="text-lg font-bold text-slate-900">내 프로젝트</h1>
           <button
@@ -142,7 +138,7 @@ export function ProjectSidebar({ projectId }: Props) {
             })}
           </ul>
         </nav>
-      </aside>
+      </div>
       {isModalOpen && (
         <NewProjectModal
           open={isModalOpen}
