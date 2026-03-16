@@ -97,7 +97,7 @@ export function StoryContextPanel({ projectId }: { projectId: number }) {
             </p>
           </div>
         ) : null}
-      </div>
+</aside>
       {isSynopModalOpen && (
         <SynopsisModal
           projectId={projectId}
