@@ -153,28 +153,87 @@ Week 8: ██████████████ 97%
 
 - [ ] 작성 글 내보내기
 - [ ] 크롬 익스텐션 / 일렉트론 앱
-- [ ] 모바일 반응형 및 웹 앱 적용
+- [x] 모바일 반응형 및 웹 앱 적용
 - [ ] 다크테마
 
 #### ✅ 완료한 작업
 
-- ✅
+- ✅ WritingSession 페이지 모바일 반응형 레이아웃 및 UX 최적화
+- ✅ 좌/우측 사이드바(프로젝트/스토리 설정) 접기/펼치기 및 토글 인터페이스 구현
+- ✅ `lucide-react` 라이브러리를 활용한 직관적인 토글 아이콘 적용
+- ✅ 하드코딩된 브레이크포인트를 제거하고 `useMediaQuery` 커스텀 훅 및 상수 시스템 도입
 
-#### 🔧 해결한 문제
+**사용자 경험(UX) 극대화를 위한 가변형 레이아웃 및 반응형 사이드바 구현**
 
-\*\*
+- **문제**: 기존 `WritingSession` 페이지는 3컬럼 고정 레이아웃으로, 해상도가 낮아지면 에디터 영역이 좁아져 집필이 불가능하거나 모바일 환경에서 레이아웃이 완전히 깨지는 문제가 있었음. 또한, 데스크탑에서도 하드코딩된 수치(`1024px`)를 사용하여 유지보수성이 떨어지는 결함이 있었음.
+- **해결**:
+  1. **상태 기반 조건부 레이아웃**: `isLeftOpen`, `isRightOpen` 상태와 `useMediaQuery` 훅을 결합하여 환경에 적합한 상태를 선언적으로 관리함.
+  2. **복합적 트랜지션 처리**:
+     - **데스크탑**: `lg:relative`와 `width` 변화를 활용하여 에디터 영역이 실시간으로 확장되는 유동적인 레이아웃 구축.
+     - **모바일**: `fixed`와 `translate-x`를 활용하여 사이드바가 화면 위를 덮는 Drawer(Overlay) 형태로 구현함.
+  3. **코드 품질 개선**: 하드코딩된 매직 넘버를 `BREAKPOINTS` 상수로 중앙 집중화하고, 이벤트 리스너 로직을 `useMediaQuery` 훅으로 캡슐화하여 재사용성을 높임.
+
+- **작성 코드 요약 (`WritingSession.tsx`)**:
+
+```tsx
+// 1. 하드코딩 제거를 위한 미디어 쿼리 훅 적용
+const isMobile = useMediaQuery(`(max-width: ${BREAKPOINTS.LG - 1}px)`);
+
+// 2. 레이아웃 엔진 핵심 로직
+<aside
+  className={`fixed inset-y-0 left-0 z-40 transition-all duration-300 ease-in-out lg:relative overflow-hidden ${
+    isLeftOpen
+      ? "w-64 translate-x-0 opacity-100"
+      : "w-0 -translate-x-full lg:translate-x-0 opacity-0 lg:opacity-100"
+  }`}
+>
+  <div className="h-full w-64 border-r bg-white">
+    <ProjectSidebar projectId={projectId} />
+  </div>
+</aside>
+
+<main className="relative flex-1 overflow-hidden">
+  {/* 항시 가시성이 확보된 토글 버튼 */}
+  {!isMobile && (
+    <button
+      onClick={toggleLeft}
+      className="absolute top-1/2 z-50 left-0 h-12 w-6 -translate-y-1/2 rounded-r-md border border-l-0 bg-white shadow-md hover:bg-primary"
+    >
+      {isLeftOpen ? <ChevronLeft /> : <ChevronRight />}
+    </button>
+  )}
+  <Editor />
+</main>
+```
+
+- **성과**:
+  - 다양한 디바이스(모바일, 태블릿, 데스크탑)에서의 완벽한 호환성 확보.
+  - "Writing AI"라는 서비스 본질에 충실하도록 '글쓰기 집중 모드'를 사용자에게 제공함.
+  - 단순 CSS 미디어 쿼리를 넘어선, React 상태와 연동된 정교한 인터랙티브 레이아웃 시스템을 구축함.
 
 #### 📌 디벨롭 사항
 
 - [ ] 백엔드 에러 핸들링 개선
 - [ ] 작성 글 내보내기
 - [ ] 크롬 익스텐션 / 일렉트론 앱
-- [ ] 모바일 반응형 및 웹 앱 적용
+- [x] 모바일 반응형 및 웹 앱 적용
 - [ ] 다크테마
 
 #### 💡 개념 정리
 
-\*\*
+**1. 선언적 미디어 쿼리 관리 (useMediaQuery Custom Hook)**
+하드코딩된 브레이크포인트 수치(`1024px` 등)는 나중에 디자인 시스템이 변경될 때 모든 파일을 찾아다니며 수정해야 하는 리스크가 있습니다. `window.matchMedia` API를 캡슐화한 `useMediaQuery` 훅과 중앙 집중형 `BREAKPOINTS` 상수를 사용하면, UI 로직을 명령형(`addEventListener`)이 아닌 선언적 방식으로 작성할 수 있어 유지보수성이 비약적으로 향상됩니다.
+
+**2. window.matchMedia API**
+- **역할**: CSS 미디어 쿼리가 현재 브라우저 상태와 일치하는지 여부를 자바스크립트에서 판단하고 감시할 수 있게 해주는 API입니다.
+- **성능적 이점**: 브라우저 창 크기가 1px이라도 변할 때마다 호출되는 `window.onresize`와 달리, 브라우저 엔진이 최적화된 방식으로 쿼리 상태가 '바뀌는 순간'에만 이벤트를 발생시킵니다. 따라서 불필요한 연산을 줄여 성능을 최적화할 수 있습니다.
+- **활용**: 이를 React 상태 시스템과 결합하면, 특정 해상도 진입 여부에 따라 UI를 선언적으로 변경할 수 있는 '반응형 인터랙션 시스템'을 구축할 수 있습니다.
+
+**3. 레이아웃 시프트와 Overflow 제어**
+사이드바를 접을 때 `width: 0`을 적용하면 내부 텍스트나 버튼들이 영역 밖으로 삐져나오는 현상이 발생합니다. 이때 부모 요소에 `overflow: hidden`을 적용하고 내부 컨텐츠는 고정 너비를 가진 Wrapper로 감싸주면, 내부 레이아웃을 파괴하지 않으면서도 자연스럽게 가려지는 애니메이션을 안정적으로 구현할 수 있습니다.
+
+**4. 사용자 가시성(Visibility)과 Z-index 전략**
+강력한 인터랙션을 제공하는 토글 버튼은 레이아웃 변화의 주체보다 항상 더 높은 레이어에 위치해야 합니다. 특히 사이드바가 화면 위를 덮는 모바일 환경에서는 버튼의 `z-index`를 최상위 레벨(`z-50`)로 관리하여, 어떤 상황에서도 사용자가 컨트롤을 잃지 않도록 설계하는 것이 인터랙티브 웹 디자인의 핵심입니다.
 
 #### 📝 피드백 내용
 
