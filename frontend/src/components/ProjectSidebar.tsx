@@ -138,7 +138,7 @@ export function ProjectSidebar({ projectId }: Props) {
             })}
           </ul>
         </nav>
-</aside>
+      </div>
       {isModalOpen && (
         <NewProjectModal
           open={isModalOpen}
