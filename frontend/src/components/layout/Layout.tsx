@@ -14,10 +14,9 @@ function Layout({ children }: LayoutProps) {
             {/* Main Content - 남은 공간을 모두 차지하며 스크롤 가능 */}
             <div className="flex-1 overflow-y-auto">
                 {children}
+                {/* Footer - 이제 콘텐츠와 함께 스크롤됩니다. */}
+                <Footer />
             </div>
-
-            {/* Footer - 고정 높이 */}
-            <Footer />
         </div>
     )
 }
