@@ -316,3 +316,129 @@ declare global {
   }
 }
 ```
+
+---
+
+## 🚀 2. 고도화할 기능 상세 (Advanced Features)
+
+기본적인 IPC 통신을 넘어, 실제 프로덕션 수준의 품질을 위한 고도화 구현 상세입니다.
+
+### [PDF] 가시성 높은 문서 내보내기
+`printToPDF`는 현재 화면을 그대로 인쇄하므로, 내보내기 전용 스타일을 적용하는 것이 좋습니다.
+
+```typescript
+// electron/main.ts
+ipcMain.handle('export-pdf', async (event, content) => {
+  const win = new BrowserWindow({ show: false }); // 보이지 않는 창 생성
+  await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(content)}`);
+  
+  // PDF 전용 CSS 주입 (예: 글꼴 설정, 여백 등)
+  await win.webContents.insertCSS(`
+    body { font-family: 'Malgun Gothic', sans-serif; padding: 50px; line-height: 1.6; }
+    h1 { text-align: center; }
+  `);
+
+  const pdfData = await win.webContents.printToPDF({
+    printBackground: true,
+    margins: { top: 1, bottom: 1, left: 1, right: 1 }
+  });
+  
+  win.close();
+  return pdfData;
+});
+```
+
+### [DOCX] MS Word 파일 생성 (라이브러리 활용)
+`docx` 패키지를 설치하여 실제 워드 파일 구조로 생성합니다.
+
+```bash
+npm install docx
+```
+
+```typescript
+import { Document, Packer, Paragraph, TextRun } from "docx";
+
+// 메인 프로세스에서 docx 객체 생성 후 바이너리 추출
+const doc = new Document({
+    sections: [{
+        properties: {},
+        children: [
+            new Paragraph({
+                children: [
+                    new TextRun(content),
+                ],
+            }),
+        ],
+    }],
+});
+
+const buffer = await Packer.toBuffer(doc);
+fs.writeFileSync(filePath, buffer);
+```
+
+---
+
+## 📦 3. 일렉트론 앱 배포 가이드 (Deployment)
+
+로컬 실행을 넘어 사용자에게 전달하기 위한 `.exe` 설치 파일 제작 및 배포 방법입니다.
+
+### 1단계: `electron-builder` 설정 (`package.json`)
+빌드 결과물의 아이콘, 이름, 빌드 방식을 정의합니다.
+
+```json
+{
+  "build": {
+    "appId": "com.writingai.app",
+    "productName": "CompanionWriter",
+    "directories": {
+      "output": "dist-build"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "frontend/public/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "Companion Writer"
+    }
+  }
+}
+```
+
+### 2단계: 빌드 실행
+```bash
+# 프론트엔드 빌드 -> 일렉트론 빌드 -> 설치 파일 생성
+npm run electron:build
+```
+- 실행 후 `dist-build/CompanionWriter Setup 1.0.0.exe` 파일이 생성됩니다.
+
+### 3단계: 배포 및 호스팅 (어디에 올려야 하나?)
+
+| 플랫폼 | 특징 | 장점 |
+| :--- | :--- | :--- |
+| **GitHub Releases** | 가장 추천하는 방식 | 무료, 버전 관리 용이, 자동 업데이트(Auto-Updater) 연동 가능 |
+| **Vercel / Netlify** | 정적 파일 호스팅 | 링크 하나로 다운로드 페이지 구축 가능, .exe 파일 업로드 허용 |
+| **Google Drive / Dropbox** | 간이 배포 | 초기 테스트용으로 공유 링크 생성 가능 |
+
+**추천 워크플로우:**
+1. **GitHub** 프로젝트 생성 후 소스 코드 푸시
+2. 빌드된 `.exe` 파일을 GitHub 저장소의 **Releases** 섹션에 업로드
+3. 사용자에게 해당 Release 페이지 링크 전달
+
+---
+
+## 🔄 4. 자동 업데이트 (Auto Update) 설정
+
+사용자가 매번 새 버전을 수동으로 다운로드하지 않게 합니다.
+
+1. `electron-updater` 설치: `npm install electron-updater`
+2. `main.ts`에 코드 추가:
+```typescript
+import { autoUpdater } from "electron-updater";
+
+app.whenReady().then(() => {
+  autoUpdater.checkForUpdatesAndNotify();
+});
+```
+3. GitHub Releases에 새 버전이 올라가면 앱 실행 시 자동으로 감지하여 업데이트를 진행합니다.
