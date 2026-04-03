@@ -43,86 +43,87 @@ function createWindow() {
         width: 1200,
         height: 800,
         webPreferences: {
-            preload: path.join(__dirname, 'preload.js'), // 빌드된 preload.js 경로
+            preload: path.join(__dirname, "preload.js"), // 빌드된 preload.js 경로
             nodeIntegration: false,
             contextIsolation: true,
         },
     });
     // 개발 모드에서는 Vite/웹팩 서버 URL을 로드하고, 프로덕션에서는 빌드된 index.html 로드
-    const startUrl = process.env.ELECTRON_START_URL || `file://${path.join(__dirname, '../dist/index.html')}`;
+    const startUrl = process.env.ELECTRON_START_URL ||
+        `file://${path.join(__dirname, "../dist/index.html")}`;
     mainWindow.loadURL(startUrl);
     if (process.env.ELECTRON_START_URL) {
         mainWindow.webContents.openDevTools();
     }
-    mainWindow.on('closed', () => {
+    mainWindow.on("closed", () => {
         mainWindow = null;
     });
 }
 electron_1.app.whenReady().then(() => {
-    if (process.platform === 'win32') {
-        electron_1.app.setAppUserModelId('com.writingai.app');
+    if (process.platform === "win32") {
+        electron_1.app.setAppUserModelId("com.writingai.app");
     }
     createWindow();
-    // 전역 단축키 등록 (예: 알트 + 시프트 + A)
-    const ret = electron_1.globalShortcut.register('CommandOrControl+Shift+A', () => {
-        console.log('AI 단축키 눌림!');
+    // 전역 단축키 등록 (예: 컨트롤 + 시프트 + A)
+    const ret = electron_1.globalShortcut.register("CommandOrControl+Shift+A", () => {
+        console.log("AI 단축키 눌림!");
         if (mainWindow) {
-            mainWindow.webContents.send('shortcut-pressed', 'trigger-ai');
+            mainWindow.webContents.send("shortcut-pressed", "trigger-ai");
         }
     });
     if (!ret) {
-        console.log('단축키 등록 실패 (다른 앱이 사용 중일 수 있음)');
+        console.log("단축키 등록 실패 (다른 앱이 사용 중일 수 있음)");
     }
-    electron_1.app.on('activate', () => {
+    electron_1.app.on("activate", () => {
         if (electron_1.BrowserWindow.getAllWindows().length === 0)
             createWindow();
     });
 });
-electron_1.app.on('window-all-closed', () => {
-    if (process.platform !== 'darwin')
+electron_1.app.on("window-all-closed", () => {
+    if (process.platform !== "darwin")
         electron_1.app.quit();
 });
 // 앱 종료 시 단축키 해제 필수!
-electron_1.app.on('will-quit', () => {
+electron_1.app.on("will-quit", () => {
     electron_1.globalShortcut.unregisterAll();
 });
 // IPC 리스너 등록
-electron_1.ipcMain.handle('export-file', async (event, format, content) => {
+electron_1.ipcMain.handle("export-file", async (event, format, content) => {
     if (!mainWindow)
         return { success: false };
     const { canceled, filePath } = await electron_1.dialog.showSaveDialog(mainWindow, {
-        title: '문서 내보내기',
+        title: "문서 내보내기",
         defaultPath: `my_writing.${format}`,
         filters: [
             { name: format.toUpperCase(), extensions: [format] },
-            { name: 'All Files', extensions: ['*'] }
-        ]
+            { name: "All Files", extensions: ["*"] },
+        ],
     });
     if (canceled || !filePath)
         return { success: false, canceled: true };
     try {
-        if (format === 'txt') {
-            fs.writeFileSync(filePath, content, 'utf-8');
+        if (format === "txt") {
+            fs.writeFileSync(filePath, content, "utf-8");
         }
-        else if (format === 'pdf') {
+        else if (format === "pdf") {
             const pdfData = await mainWindow.webContents.printToPDF({});
             fs.writeFileSync(filePath, pdfData);
         }
         else {
             // 임시 저장
-            fs.writeFileSync(filePath, content, 'utf-8');
+            fs.writeFileSync(filePath, content, "utf-8");
         }
         return { success: true, path: filePath };
     }
     catch (error) {
-        console.error('파일 저장 실패:', error);
+        console.error("파일 저장 실패:", error);
         return { success: false, error: String(error) };
     }
 });
-electron_1.ipcMain.on('show-notification', (event, title, body) => {
+electron_1.ipcMain.on("show-notification", (event, title, body) => {
     if (electron_1.Notification.isSupported()) {
         const notification = new electron_1.Notification({ title, body });
-        notification.on('click', () => {
+        notification.on("click", () => {
             if (mainWindow) {
                 if (mainWindow.isMinimized())
                     mainWindow.restore();
@@ -132,14 +133,14 @@ electron_1.ipcMain.on('show-notification', (event, title, body) => {
         notification.show();
     }
 });
-electron_1.ipcMain.handle('save-doc', (event, docId, content) => {
+electron_1.ipcMain.handle("save-doc", (event, docId, content) => {
     try {
         (0, database_1.saveDocument)(docId, content);
         console.log(`자동 저장 완료: ${docId}`);
         return { success: true };
     }
     catch (err) {
-        console.error('자동 저장 실패:', err);
+        console.error("자동 저장 실패:", err);
         return { success: false };
     }
 });
