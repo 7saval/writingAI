@@ -245,3 +245,145 @@ AI와 사용자가 번갈아가며 소설을 써나가는 인터랙티브 글쓰
 2.  **Selectors (셀렉터)**: 큰 상태 저장소(냉장고)에서 내가 당장 필요한 데이터(계란)만 쏙 골라내는 기능입니다. 필요한 것만 골라 쓰면 관련 없는 데이터가 변해도 화면이 다시 그려지지 않아 성능 최적화에 유리합니다.
 3.  **이터레이션 (Iteration)**: 결과물을 완성하기 위해 과정을 반복하며 발전시키는 '한 주기'입니다. 빠른 이터레이션이 가능하다는 것은 코드를 짜고 확인하는 피드백 루프가 매우 짧아 개발 속도가 빠르다는 의미입니다.
 4.  **오케스트레이션 (Orchestration)**: 지휘자가 여러 악기를 조율하듯, 다양한 데이터나 기능을 하나로 묶어 관리하는 것입니다. 우리 프로젝트에서는 사용자 지시사항과 소설의 단계를 조화롭게 묶어 AI에게 전달하는 과정을 뜻합니다.
+
+## 백엔드 개발 경험 어필
+
+- **Express + TypeORM 기반 API 설계 경험**
+  - 프로젝트 상세 조회에서 연관된 문단까지 함께 조회하고 정렬해, 단순 CRUD를 넘어 실제 서비스에서 바로 쓸 수 있는 응답 구조를 설계했습니다.
+
+```typescript
+const project = await repo.findOne({
+  where: { id: projectId },
+  relations: ["paragraphs"],
+  order: {
+    paragraphs: {
+      orderIndex: "ASC",
+    },
+  },
+});
+
+if (!project) {
+  return res
+    .status(StatusCodes.NOT_FOUND)
+    .json({ message: "Project not found" });
+}
+```
+
+- **인증 로직을 미들웨어로 분리해 재사용성 확보**
+  - JWT 검증과 사용자 정보 주입을 `ensureAuth`로 분리해 컨트롤러가 인증 로직보다 비즈니스 로직에 집중하도록 만들었습니다.
+
+```typescript
+const authHeader = req.headers.authorization;
+const token = authHeader && authHeader.split(" ")[1];
+
+const decoded = jwt.verify(
+  token,
+  process.env.ACCESS_TOKEN_SECRET!,
+) as jwt.JwtPayload;
+
+req.user = {
+  id: decoded.id,
+  email: decoded.email,
+};
+```
+
+- **보안과 UX를 함께 고려한 토큰 인증 구조 구현**
+  - access token은 응답으로 내려주고, refresh token은 `httpOnly` 쿠키에 저장해 보안성을 높였습니다.
+
+```typescript
+const accessToken = jwt.sign({ id: user.id, email: user.email }, secret, {
+  expiresIn: "30m",
+});
+
+res.cookie("refreshToken", refreshToken, {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "lax",
+  maxAge: 7 * 24 * 60 * 60 * 1000,
+});
+```
+
+- **계정/인증 예외 처리까지 포함한 백엔드 품질 개선 경험**
+  - 회원가입, 이메일 중복, 비밀번호 재설정에서 실패 케이스를 상태 코드와 메시지로 명확히 분기했습니다.
+
+```typescript
+if (error.code === "ER_DUP_ENTRY") {
+  return res.status(StatusCodes.CONFLICT).json({
+    message: "이미 가입한 이메일입니다.",
+  });
+}
+
+if (!user.resetCodeExpires || user.resetCodeExpires < new Date()) {
+  return res.status(StatusCodes.BAD_REQUEST).json({
+    message: "인증코드가 만료되었습니다.",
+  });
+}
+```
+
+- **AI 기능도 백엔드 관점에서 흐름을 설계한 경험**
+  - 사용자 문단 저장 후 AI 생성 결과를 이어서 저장하는 흐름을 서버에서 순차적으로 처리했습니다.
+
+```typescript
+const userParagraph = paragraphRepo.create({
+  project,
+  content: req.body.content,
+  writtenBy: "user",
+  orderIndex: project.paragraphs.length,
+});
+await paragraphRepo.save(userParagraph);
+
+const aiText = await generateNextParagraph(
+  project,
+  [...project.paragraphs, userParagraph],
+  {
+    prompt: req.body.prompt,
+    stage: req.body.stage,
+  },
+);
+```
+
+- **재생성 기능에도 비즈니스 규칙을 반영한 경험**
+  - 아무 문단이나 재생성하지 않고, AI가 작성한 문단만 재생성 가능하도록 제한했습니다.
+
+```typescript
+if (paragraph.writtenBy !== "ai") {
+  return res.status(StatusCodes.BAD_REQUEST).json({
+    message: "Only AI paragraphs can be regenerated",
+  });
+}
+```
+
+- **유연한 데이터 처리와 방어 코드 작성 경험**
+  - `lorebook` 입력이 문자열로 들어와도 파싱해 처리하고, 실패 시 기본값으로 복구해 서버를 더 견고하게 만들었습니다.
+
+```typescript
+let lorebookData = req.body.lorebook;
+if (typeof lorebookData === "string") {
+  try {
+    lorebookData = JSON.parse(lorebookData);
+  } catch (e) {
+    lorebookData = [];
+  }
+}
+
+project.lorebook = lorebookData;
+```
+
+- **Express 서버 실행 환경과 미들웨어 체인을 직접 구성한 경험**
+  - [`index.ts`](/c:/devCourse/project/personal/writingAI/backend/src/index.ts)에서 DB 초기화 이후 서버를 띄우고, CORS, JSON 파싱, 쿠키 파싱, 라우터, 전역 에러 핸들러 순차적 연결
+  - 특히 `credentials: true`와 `cookieParser()`를 함께 설정해 쿠키 기반 인증 흐름이 동작하도록 서버 레벨에서 환경을 직접 구성
+
+```typescript
+await initDataSource();
+
+app.use(
+  cors({
+    origin: process.env.CORS_ORIGIN?.split(","),
+    credentials: true,
+  }),
+);
+app.use(express.json());
+app.use(cookieParser());
+app.use("/api", router);
+app.use(errorHandler);
+```

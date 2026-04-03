@@ -1,5 +1,22 @@
 {
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "backend:dev": "npm run dev:server --prefix backend",
+    "electron:dev": "concurrently \"npm run backend:dev\" \"npm run dev --prefix frontend\" \"wait-on http://localhost:5173 && tsc -p tsconfig.electron.json && cross-env ELECTRON_START_URL=http://localhost:5173 electron .\"",
+    "electron:build": "npm run build --prefix frontend && tsc -p tsconfig.electron.json && electron-builder",
+    "postinstall": "electron-rebuild -f -w better-sqlite3"
+  },
   "dependencies": {
+    "better-sqlite3": "^12.8.0",
     "http-status-codes": "^2.3.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "baseline-browser-mapping": "^2.10.8",
+    "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
+    "electron": "^31.2.0",
+    "electron-builder": "^24.13.3",
+    "wait-on": "^9.0.4"
   }
 }
