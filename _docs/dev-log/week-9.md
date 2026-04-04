@@ -1,0 +1,383 @@
+### 📟 2026-04-04 (Day 31)
+
+#### 🎯 오늘의 목표
+
+- [x] 프로젝트별 paragraph 문서 내보내기 방향 설계
+- [x] Word/PDF export 가이드 문서 작성 및 범위 확정
+- [x] `Editor`에서 내보내기 UI 연결
+- [x] 웹 Word export 1차 구현
+- [ ] 웹 PDF 실제 생성 구현
+- [ ] Electron 저장 흐름 구현
+
+#### ✅ 완료한 작업
+
+- [x] 프로젝트 문서 export 요구사항을 정리하고 `_docs/export_guide.md` 작성
+  - 프로젝트 문서에는 제목만 포함
+  - `ai`/`user` 작성자 라벨은 내보내기 다이얼로그에서 옵션으로 선택
+  - 웹 / Electron 구현 방향을 분리해서 설계
+- [x] `frontend/src/features/export/` 구조 추가
+  - `types.ts`
+  - `utils/buildExportDocument.ts`
+  - `utils/sanitizeFilename.ts`
+  - `web/exportWord.ts`
+  - `web/exportPdf.ts`
+  - `components/ExportDialog.tsx`
+- [x] 공통 export 데이터 모델 정의
+  - `ExportFormat`
+  - `ExportParagraph`
+  - `ExportDocumentModel`
+  - `ExportDialogValue`
+- [x] export 문서 변환 로직 구현
+  - 로컬 상태 `paragraphs` 기준으로 export
+  - `orderIndex` 정렬
+  - 빈 문단 제거
+  - `isLoading` 임시 AI 문단 제거
+  - 파일명 safe title 처리
+- [x] `Editor.tsx`에 내보내기 UI 연결
+  - 프로젝트 제목 조회를 위해 `useProjectDetailQuery` 연결
+  - 상단 내보내기 버튼 추가
+  - `ExportDialog` 연결
+  - 포맷 선택 및 작성자 라벨 옵션 상태 반영
+- [x] 웹 Word export 1차 구현
+  - `docx` 패키지 설치
+  - 프로젝트 제목 + 문단 본문 기반 `.docx` 생성
+  - 작성자 라벨 옵션이 켜지면 `AI` / `USER` 라벨 포함
+  - 브라우저 다운로드 트리거 연결
+- [x] 웹 PDF export 구현
+  - `html2pdf.js` 기반 웹 PDF export 1차 구현
+  - 대상 파일: `frontend/src/features/export/web/exportPdf.ts`
+  - `ExportDialog`에서 PDF 포맷 선택 시 호출
+  - 프로젝트 제목 + 문단 본문 기반 PDF 생성
+  - 작성자 라벨 옵션이 켜지면 `AI` / `USER` 라벨 포함
+  - 브라우저 다운로드 트리거 연결
+
+#### 🧩 해결한 문제
+
+**문제 1: export 기능 범위가 모호해서 구현 전에 정책이 흔들릴 수 있었음**
+
+- **상황**: 프로젝트 제목 외에 장르, 설명, 작성자 라벨, PDF 저장 방식까지 한 번에 섞여 있어 구현 경계가 불명확했음.
+- **해결**:
+  - `_docs/export_guide.md`에 범위를 먼저 고정
+  - "제목만 포함"을 확정
+  - 작성자 라벨은 다이얼로그 옵션으로 분리
+  - 웹 Word를 1차 목표, PDF/Electron은 후속 단계로 분리
+- **결과**: 구현 우선순위가 선명해져서 과도한 확장 없이 바로 개발 가능해짐.
+
+#### 🧠 배운 점
+
+**1. export 기능은 "문서 생성"과 "저장 방식"을 분리하는 게 좋다**
+
+- 문서 본문을 만드는 공통 레이어와
+- 웹 다운로드 / Electron 저장을 분리하면
+- 이후 PDF나 Electron 확장 시 재사용성이 높아진다.
+
+**2. 구현 전에 정책을 문서로 잠그는 게 개발 속도를 올린다**
+
+- 제목만 포함할지
+- 작성자 라벨을 기본값으로 넣을지
+- PDF를 바로 할지
+
+이런 부분을 미리 정하면 UI와 데이터 모델이 흔들리지 않는다.
+
+**3. 브라우저 export는 Word부터 붙이는 게 안정적이다**
+
+- Word는 `docx` 기반으로 구조화된 문서를 만들기 쉬움
+- PDF는 품질, 페이지 분할, 폰트 대응 등 고려할 점이 많아 후순위로 두는 게 현실적
+
+#### 개념정리
+
+**1. `docx` 라이브러리 설치 이유**
+
+- 브라우저 환경에서 `.docx` 파일을 직접 생성할 수 있게 해주는 라이브러리다.
+- Word 문서를 단순 텍스트가 아니라 문단, 정렬, 글자 스타일 같은 구조를 가진 문서로 만들 수 있다.
+- 이번 export 기능에서는 프로젝트 제목, 문단 본문, 작성자 라벨 옵션을 Word 문서 형식으로 내보내기 위해 사용했다.
+
+설치 명령:
+
+```bash
+cmd /c npm install docx --prefix frontend
+```
+
+**2. `docx` import 모듈 역할**
+
+- 참고링크 : [docx라이브러리](https://www.npmjs.com/package/docx)
+
+```ts
+import {
+  AlignmentType,
+  Document,
+  Packer,
+  Paragraph as DocxParagraph,
+  TextRun,
+} from "docx";
+```
+
+- `Document`
+  - Word 파일 전체를 나타내는 최상위 문서 객체다.
+  - 제목, 본문 문단, 섹션 구성을 모두 이 객체 안에 담는다.
+- `Paragraph as DocxParagraph`
+  - Word 문서의 한 문단 블록을 만든다.
+  - 프로젝트 제목 한 줄, 본문 문단 한 덩어리 같은 단위를 표현할 때 사용한다.
+  - 기존 프로젝트의 `Paragraph` 타입과 이름이 겹치므로 `DocxParagraph`로 alias를 주었다.
+- `TextRun`
+  - 문단 안에서 실제 텍스트 조각을 만든다.
+  - 굵게, 기울임, 글자 크기 같은 텍스트 스타일을 적용할 수 있다.
+  - 예를 들어 제목 텍스트, `AI` / `USER` 라벨, 문단 본문을 각각 `TextRun`으로 구성할 수 있다.
+- `AlignmentType`
+  - 문단 정렬 방식을 지정할 때 사용한다.
+  - 제목을 가운데 정렬하거나 본문은 기본 정렬로 두는 식으로 활용한다.
+- `Packer`
+  - `Document` 객체를 실제 다운로드 가능한 `.docx` 바이너리 또는 Blob으로 변환한다.
+  - 브라우저 다운로드를 트리거하려면 최종적으로 이 단계가 필요하다.
+
+**3. 현재 `exportWord.ts`에서의 역할 정리**
+
+- `Document`: export할 Word 파일 전체 뼈대 생성
+- `DocxParagraph`: 제목 문단, 날짜 문단, 본문 문단 생성
+- `TextRun`: 제목 텍스트, 작성자 라벨, 문단 본문 작성
+- `AlignmentType`: 제목 중앙 정렬
+- `Packer`: 완성된 문서를 Blob으로 변환해 다운로드 가능하게 처리
+
+**4. Blob이란 무엇인가**
+
+- `Blob`은 브라우저에서 다루는 파일 형태의 바이너리 데이터 덩어리다.
+- 아직 로컬 디스크에 저장된 파일은 아니지만, 브라우저 안에서는 파일처럼 취급할 수 있다.
+- 이미지, PDF, Word 문서, 텍스트 파일 같은 데이터를 다운로드 가능한 형태로 만들 때 자주 사용한다.
+
+이번 export 흐름에서는:
+
+1. `Document`로 Word 문서 구조를 만든다.
+2. `Packer.toBlob(doc)`으로 `.docx` 파일 데이터를 `Blob`으로 변환한다.
+3. 이 `Blob`을 브라우저 다운로드 링크에 연결해서 실제 파일 다운로드를 시작한다.
+
+즉, `Blob`은 "브라우저 메모리 안에 있는 파일 데이터"라고 이해하면 된다.
+
+**5. `URL.createObjectURL(blob)`는 왜 필요한가**
+
+- `Blob`은 파일 데이터 자체이지만, 이 데이터만으로는 `<a href="...">` 같은 다운로드 링크에 바로 연결할 수 없다.
+- `URL.createObjectURL(blob)`은 브라우저 메모리에 있는 `Blob` 데이터에 접근할 수 있는 임시 URL을 만들어준다.
+- 이 임시 URL을 `a.href`에 넣으면 브라우저가 해당 `Blob`을 파일처럼 다운로드할 수 있다.
+
+현재 export 흐름에서는:
+
+1. `Packer.toBlob(doc)`으로 Word 파일 데이터를 만든다.
+2. `URL.createObjectURL(blob)`으로 임시 URL을 만든다.
+3. `a.href = objectUrl`로 링크에 연결한다.
+4. `a.click()`으로 다운로드를 시작한다.
+5. 작업이 끝나면 `URL.revokeObjectURL(objectUrl)`로 메모리를 정리한다.
+
+즉, `createObjectURL()`은 "브라우저 메모리 속 파일 데이터에 접근할 수 있는 임시 주소를 만들어주는 함수"다.
+
+#### 📝 코드/구조 메모
+
+**Export 타입**
+
+```ts
+export type ExportFormat = "word" | "pdf";
+
+export interface ExportDocumentModel {
+  projectId: number;
+  projectTitle: string;
+  exportedAt: string;
+  includeAuthorLabel: boolean;
+  paragraphs: ExportParagraph[];
+}
+```
+
+**문서 변환 레이어 핵심**
+
+```ts
+const normalizedParagraphs = [...paragraphs]
+  .filter((paragraph) => !paragraph.isLoading)
+  .filter((paragraph) => paragraph.content.trim().length > 0)
+  .sort((a, b) => a.orderIndex - b.orderIndex);
+```
+
+**Editor 연결 포인트**
+
+- `useProjectDetailQuery`로 프로젝트 제목 조회
+- `ExportDialog`에서 포맷 / 작성자 라벨 선택
+- `handleExport()`에서 `buildExportDocument()` 호출 후 포맷별 분기
+
+---
+
+#### 📄 PDF export 구현
+
+- [x] `html2pdf.js` 기반 웹 PDF export 1차 구현
+  - 대상 파일: `frontend/src/features/export/web/exportPdf.ts`
+  - 입력 데이터는 `buildExportDocument()`가 만든 `ExportDocumentModel`을 그대로 재사용
+  - 프로젝트 제목, export 날짜, 문단 목록, 작성자 라벨 옵션을 PDF용 HTML 컨테이너로 구성
+  - PDF 저장 시 파일명 규칙은 공통 유틸을 통해 `{projectTitle}-{YYYY-MM-DD}.pdf` 형식으로 맞춤
+
+- [x] PDF 라이브러리 로딩 최적화
+  - 초기에는 `html2pdf.js`를 정적 import로 연결했지만 메인 번들 크기가 너무 커짐
+  - 이후 `exportPdfDocument()` 내부에서 동적 import로 전환해 PDF 기능 사용 시점에만 라이브러리를 로드하도록 변경
+
+- [x] PDF 렌더링 안정화 시도
+  - 첫 구현에서는 PDF 컨테이너를 화면 밖으로 크게 밀어둔 상태에서 캡처했는데, 내용이 비어 보이는 문제가 발생
+  - 이후 숨김 방식을 여러 차례 조정했고, 최종적으로는 숨김용 래퍼(`mountNode`)를 따로 만들고 실제 PDF 타깃 컨테이너는 정상 레이아웃 상태로 렌더링한 뒤 캡처하도록 변경
+  - `document.fonts.ready`와 `requestAnimationFrame` 대기를 추가해 폰트와 레이아웃이 잡힌 뒤 PDF를 생성하도록 보완
+
+#### 🧩 PDF export 트러블슈팅
+
+**문제 2: `html2pdf.js`로 생성한 PDF가 처음에는 비어 있거나 내용이 보이지 않는 문제가 있었다**
+
+- **상황**:
+  - PDF export 기능은 정상 실행되지만, 결과 PDF에서 제목과 문단 텍스트가 보이지 않거나 빈 페이지처럼 출력되는 경우가 있었다.
+  - 특히 PDF용 DOM을 `left: -99999px`처럼 멀리 보낸 상태에서 캡처할 때 문제가 두드러졌다.
+- **해결**:
+  - PDF 컨테이너 자체를 숨기지 않고, 바깥 래퍼만 화면 밖으로 이동시키는 구조로 변경했다.
+  - 캡처 대상은 정상적인 크기와 레이아웃을 가진 컨테이너로 유지했다.
+  - 폰트 로딩과 브라우저 렌더 타이밍을 기다린 뒤 `html2pdf()`를 실행하도록 순서를 보완했다.
+- **결과**:
+  - PDF 내용이 정상적으로 보이기 시작했다.
+  - 다만 페이지 분할 품질은 여전히 `html2pdf.js`와 `html2canvas` 렌더링 특성에 영향을 받는 상태다.
+
+**문제 3: 페이지가 남아 있어도 다음 문단이 통째로 다음 페이지로 넘어가거나, 반대로 문단이 어색하게 잘리는 문제가 있었다**
+
+- **상황**:
+  - `break-inside: avoid`를 줄 때는 짧은 문단도 페이지 끝에서 통째로 다음 페이지로 밀리는 경우가 생겼다.
+  - 이를 제거하면 이번에는 문단 중간이 너무 어색하게 잘리는 문제가 나타났다.
+- **해석**:
+  - `html2pdf.js`는 HTML을 캔버스 이미지처럼 렌더링한 뒤 PDF에 넣는 구조라, 문서 편집기 수준의 정교한 문단 분할 제어에는 한계가 있다.
+  - 즉, CSS만으로 어느 정도 조정은 가능하지만 페이지 분할 품질을 완전히 원하는 수준으로 맞추기 어렵다.
+- **현재 판단**:
+  - 1차 구현으로는 `html2pdf.js` 방식이 빠르게 기능을 붙이기에는 적합했다.
+  - 하지만 문단이 많은 문서나 페이지 품질을 중요하게 보는 사용성에서는 한계가 분명히 드러났다.
+
+#### 📘 개념 정리
+
+- 참고링크 : [html2pdf.js](https://www.npmjs.com/package/html2pdf.js)
+
+**왜 `html2pdf.js`를 선택했는가**
+
+- 브라우저에서 바로 동작하고 구현 속도가 빠르다.
+- 기존 HTML/CSS 감각으로 문서 레이아웃을 구성할 수 있다.
+- 프로젝트 제목, 날짜, 문단 텍스트 정도의 단순 문서에는 1차 구현용으로 접근성이 좋다.
+
+**`html2pdf.js` 방식의 한계**
+
+- 내부적으로 `html2canvas` 기반 렌더링을 사용하므로 페이지 분할이 문서 편집기처럼 정교하지 않다.
+- CSS 조정으로 어느 정도 보완할 수 있지만, 문단 중간 잘림이나 애매한 페이지 넘김을 완전히 제어하기 어렵다.
+- 즉, "빠르게 붙이기 좋은 방식"이지만 "문단 중심 문서 품질"을 높이는 데는 구조적 한계가 있다.
+
+#### 📦 번들 최적화 추가 진행
+
+- [x] PDF export 라이브러리 `html2pdf.js`를 정적 import에서 동적 import로 전환
+  - 대상 파일: `frontend/src/features/export/web/exportPdf.ts`
+  - 변경 전: 앱 초기 로딩 시 메인 번들에 PDF 라이브러리가 함께 포함
+  - 변경 후: 사용자가 PDF 내보내기를 실행할 때만 별도 청크를 로드
+
+#### 🧩 트러블슈팅
+
+**문제 4: PDF export 구현 후 빌드 경고가 남았고, 메인 번들 크기가 너무 크게 묶였다**
+
+- **상황**:
+  - `html2pdf.js`를 일반 import로 연결한 상태에서 `npm run build --prefix frontend`를 실행하면 메인 번들이 크게 증가했다.
+  - Vite가 `Some chunks are larger than 500 kB after minification` 경고를 출력했다.
+  - PDF 기능은 자주 쓰는 초기 화면 기능이 아닌데도 모든 사용자가 첫 로딩 시 해당 라이브러리 비용을 함께 부담하는 구조였다.
+- **해결**:
+  - `frontend/src/features/export/web/exportPdf.ts` 상단의 정적 import를 제거했다.
+  - `exportPdfDocument()` 내부에서 `const { default: html2pdf } = await import("html2pdf.js")` 방식으로 동적 import를 적용했다.
+  - 그 결과 PDF export 코드는 메인 번들에서 분리되어 별도 청크로 출력되도록 변경됐다.
+- **결과**:
+  - 초기 로딩 시 메인 번들에 PDF 라이브러리가 포함되지 않게 되었다.
+  - PDF 내보내기를 실제로 사용할 때만 PDF 청크를 네트워크로 내려받는 구조가 되었다.
+  - 빌드 경고 자체는 남아 있지만, 메인 번들 크기는 큰 폭으로 감소했다.
+
+**빌드 결과 수치 비교**
+
+- 변경 전
+  - 메인 번들: `assets/index-5CoD4fSA.js` 약 `2,004.24 kB`
+  - 별도 PDF 청크: 없음
+- 변경 후
+  - 메인 번들: `assets/index-BaDRfUSb.js` 약 `1,012.23 kB`
+  - PDF 청크: `assets/html2pdf-BR1UAQwj.js` 약 `975.80 kB`
+
+**수치 해석**
+
+- 메인 번들이 약 `992.01 kB` 감소했다.
+- 감소율 기준으로 보면 메인 번들 크기가 약 `49.5%` 줄었다.
+- 즉, 초기 화면 진입 시점에는 PDF 기능 비용을 거의 절반 수준까지 메인 번들에서 걷어낸 셈이다.
+
+#### 📘 개념 정리
+
+**번들이란 무엇인가**
+
+- 번들은 브라우저가 실제로 다운로드하고 실행하는 JavaScript 묶음 파일이다.
+- 개발 중에는 코드가 여러 파일로 나뉘어 있지만, 배포 빌드에서는 번들러가 이를 몇 개의 결과 파일로 합친다.
+- 이 결과 파일이 너무 크면 브라우저가 다운로드, 파싱, 실행하는 비용이 모두 증가한다.
+- 그래서 자주 쓰지 않는 기능이나 무거운 라이브러리는 동적 import로 분리해서 필요할 때만 불러오는 방식이 성능상 유리하다.
+
+**이번 작업에서 번들 분리가 의미하는 것**
+
+- Word export는 상대적으로 가볍고 앱 흐름에 자연스럽게 포함되어 있어 기존 방식 유지가 가능했다.
+- PDF export는 `html2pdf.js` 자체가 무거워서 메인 번들에 항상 포함시키기엔 부담이 컸다.
+- 따라서 PDF 기능만 별도 청크로 분리해 초기 로딩 성능을 개선했다.
+
+#### 🎨 UI/UX 추가 진행
+
+- [x] `Editor` export UI를 북마크 기반 hover/dropdown 구조로 개편
+  - `frontend/src/components/EditorHeader.tsx`를 분리해서 북마크 trigger와 dropdown button UI를 담당하게 구성
+  - 상단 고정 버튼 1개만 두던 방식에서 export 진입 UX를 더 잘 드러내는 구조로 변경
+- [x] dropdown에 `내보내기` 버튼 1개만 남기고, 프로젝트명 길이와 무관하게 한 줄로 보이도록 고정 너비와 `whitespace-nowrap` 적용
+- [x] 특정 프로젝트에서만 다운로드 아이콘이 가려지는 현상 원인 분석
+  - 스크롤 컨테이너와 UI 오버레이가 같은 레이어 축에서 겹치며, 스크롤바 유무에 따라 북마크 우측 아이콘 가시성이 달라질 수 있음을 확인
+  - `scrollTop = scrollHeight`로 최신 문단까지 이동하는 프로젝트에서 문제가 더 잘 드러나는 점도 정리
+- [x] 북마크를 스크롤 영역 바깥 고정 레이어로 분리해 스크롤바와 독립
+  - hover가 끊기지 않도록 `pointer-events`, `group-hover`, `z-index` 경로를 다시 조정
+  - 우측 정렬 기준도 고정 레이어 기준으로 재정렬
+- [x] 프로젝트 이동 시 `현재 프로젝트` fallback 문구가 잠깐 보이는 문제 해결
+  - `projectDetail?.title ?? ""`로 수정해 로딩 중 잘못된 기본 문구가 노출되지 않도록 처리
+
+#### 🩹 UI/UX 해결한 문제
+
+**문제 5: export UI는 찾기 쉬워야 하고, 동시에 hover 동작도 안정적이어야 했음**
+
+- **상황**: 상단 고정 버튼 방식은 발견성이 약했고, hover UI로 바꾸자 아이콘 가림, 버튼 줄바꿈, hover 경로 끊김 같은 문제가 함께 발생
+- **해결**:
+  - 북마크 + 소형 dropdown 구조로 단순화
+  - 고정 폭, 줄바꿈 방지, 스크롤바와 분리된 고정 레이어로 문제를 각각 해소
+  - hover가 깨질 때는 레이아웃보다 `pointer-events` 경로를 먼저 점검
+- **결과**: export UI를 "찾을 수 있고", "hover가 유지되고", "스크롤과 독립적인" 상태로 수렴시킴
+
+#### 🧠 추가로 배운 것
+
+**hover UI는 CSS 몇 줄 문제가 아니라, 레이어/스크롤/포인터 이벤트가 동시에 얽히는 구조 문제일 수 있다**
+
+- `pointer-events-none` 하나만 잘못 들어가도 hover가 즉시 끊어진다
+- `overflow-y-auto`로 스크롤바가 생기면 우측 정렬 UI의 체감 위치가 달라질 수 있다
+- fallback 문구는 로딩 UX에서 "잠깐 보이는 잘못된 상태"만으로도 버그처럼 느껴질 수 있다
+
+---
+
+#### 🚀 디벨롭할 사항
+
+- [ ] `jsPDF` 기반 PDF export 전환 검토
+  - 제목, 날짜, 문단 텍스트를 PDF 좌표 기반으로 직접 배치하면 페이지 넘김 기준을 우리가 제어할 수 있다.
+  - 특히 현재 문제인 문단 잘림, 애매한 공백, 페이지 분할 품질 개선에 더 적합하다.
+- [ ] `jsPDF` 전환 시 한글 폰트 처리 전략 정리
+  - 웹 환경에서 한글이 깨지지 않도록 폰트 임베드 또는 사용 가능한 폰트 전략을 먼저 정리해야 한다.
+- [ ] `html2pdf.js` 유지 시 보완안 추가 검토
+  - 짧은 문단만 보호하고 긴 문단만 분할 허용하는 혼합 전략
+  - 문단 간격, 줄간격, 페이지 여백을 조정하는 출력 최적화
+- [ ] Electron 저장 다이얼로그 설계 시작
+
+- [ ] 라우트 단위 코드 스플리팅 적용 검토
+  - 에디터, 프로젝트 상세, 설정 화면처럼 진입 경로가 분리되는 페이지는 route 기준으로 청크를 나누면 초기 번들을 더 줄일 수 있다.
+- [ ] 다른 무거운 의존성도 동적 import 전환 검토
+  - 실제 사용 시점이 늦거나 특정 기능에서만 필요한 라이브러리는 PDF와 같은 방식으로 필요 시 로드하도록 분리할 수 있다.
+- [ ] 번들 분석 도구 도입 검토
+  - `vite-bundle-visualizer` 또는 유사 도구로 어떤 라이브러리가 메인 번들을 키우는지 시각적으로 확인하면 다음 최적화 우선순위를 정하기 쉽다.
+
+#### ❓ 이슈 / 질문
+
+- PDF를 웹에서 바로 생성할지, Electron 쪽 품질을 우선할지 결정이 필요함
+- 작성자 라벨 표시를 `AI` / `USER`로 유지할지 한글(`AI`, `사용자`)로 바꿀지 UX 판단이 남아 있음
+
+#### 📊 진행률
+
+Week 9: ███░░ 30%
+전체: ███████░░░ 70%
+
+---
