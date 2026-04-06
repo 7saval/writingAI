@@ -1,4 +1,4 @@
-# Export Guide
+﻿# Export Guide
 
 ## 목표
 
@@ -461,3 +461,200 @@ frontend/src/
 4. [x] 다이얼로그에서 포맷과 작성자 라벨 옵션을 선택
 5. [x] 웹은 `docx` 기반 Word 다운로드부터 구현
 6. [ ] PDF는 웹 1차 구현 후, 품질이 필요하면 Electron `printToPDF()`를 고도화
+---
+
+## 2026-04-07 Update
+
+이 아래 내용은 현재 구현 기준의 최신 정리다. 기존 상단 문서에는 초안 단계의 `html2pdf.js` 검토 내용이 남아 있으므로, 실제 구현과 이후 Electron 개발은 이 섹션을 우선 기준으로 본다.
+
+### 현재 상태 요약
+
+- 웹 Word export: 구현 완료
+- 웹 PDF export: `html2pdf.js` 방식에서 `jsPDF` 방식으로 전환 완료
+- Electron export: 아직 미구현, 다음 단계 설계 필요
+
+### 현재 웹 export 구조
+
+현재 웹 export 흐름은 아래처럼 정리된다.
+
+1. `Editor.tsx`에서 현재 `projectId`, `projectDetail`, `paragraphs`를 수집한다.
+2. `buildExportDocument()`로 공통 `ExportDocumentModel`을 만든다.
+3. 포맷에 따라 `exportWordDocument()` 또는 `exportPdfDocument()`를 호출한다.
+4. 웹에서는 Blob 기반 다운로드로 최종 파일 저장을 처리한다.
+
+### 현재 PDF 구현 기준
+
+현재 PDF export는 더 이상 HTML을 숨겨서 캡처하지 않는다.
+
+- 대상 파일: `frontend/src/features/export/web/exportPdf.ts`
+- PDF 라이브러리: `jspdf`
+- 폰트 로더: `frontend/src/features/export/web/pdfFonts.ts`
+- 레이아웃 상수: `frontend/src/features/export/constants/pdf.ts`
+
+구현 방식:
+
+1. `exportPdfDocument()`에서 `jsPDF`를 동적 import 한다.
+2. `ensurePdfFonts()`로 `Noto Sans KR` 일반/볼드 폰트를 `jsPDF` VFS에 등록한다.
+3. A4 세로 문서 기준으로 제목, export 날짜, 작성자 라벨, 본문을 직접 좌표 배치한다.
+4. 본문은 `splitTextToSize()`로 줄 단위로 분해한다.
+5. 현재 Y 좌표와 하단 여백을 비교해 공간이 부족하면 `addPage()`로 다음 페이지를 추가한다.
+6. 최종 PDF는 `output("blob")` 후 브라우저 다운로드로 저장한다.
+
+### 왜 `html2pdf.js`가 아니라 `jsPDF`를 선택했는가
+
+기존 `html2pdf.js` 방식은 빠르게 기능을 붙이는 데는 유리했지만, 현재 요구사항에는 한계가 있었다.
+
+- 문단이 페이지 끝에서 자연스럽게 이어지는 문서형 출력이 중요했다.
+- `html2pdf.js`는 HTML/CSS 렌더링 결과를 PDF로 바꾸는 방식이라 문단 분할을 정교하게 제어하기 어려웠다.
+- 긴 문단이 많을수록 페이지 브레이크 품질이 렌더링 결과와 CSS 규칙에 크게 의존했다.
+- 이번 export는 "화면 복제"보다 "문서 조판" 성격이 더 강하므로 `jsPDF`가 더 적합했다.
+
+### 현재 PDF 레이아웃 원칙
+
+- 문서 크기: A4 portrait
+- 단위: mm
+- 제목: 가운데 정렬, 굵게
+- 날짜: 제목 아래 가운데 정렬
+- 작성자 라벨: 옵션이 켜진 경우에만 각 문단 위에 출력
+- 본문: 좌측 정렬, 줄간격 기반 수직 배치
+- 페이지 분할: 남은 공간을 계산해서 줄 단위로 다음 페이지로 넘김
+
+### 한글 폰트 처리 전략
+
+웹 `jsPDF` 출력에서 한글 안정성을 위해 아래 전략을 사용한다.
+
+- 폰트: `Noto Sans KR`
+- 위치: `frontend/src/assets/fonts/`
+- 파일:
+  - `NotoSansKR-Regular.ttf`
+  - `NotoSansKR-Bold.ttf`
+- 등록 방식:
+  - 번들된 폰트 URL을 `fetch`
+  - `ArrayBuffer`를 binary string으로 변환
+  - `addFileToVFS()` + `addFont()`로 `jsPDF`에 등록
+
+주의:
+
+- 웹 PDF는 시스템 폰트 의존이 아니라 번들된 폰트 파일을 기준으로 동작한다.
+- 폰트 파일이 바뀌면 줄폭, 줄바꿈, 페이지 분할 결과도 달라질 수 있다.
+
+### 파일별 책임 정리
+
+- `frontend/src/features/export/types.ts`
+  - export 공통 타입 정의
+- `frontend/src/features/export/utils/buildExportDocument.ts`
+  - UI 상태를 export 문서 모델로 정규화
+- `frontend/src/features/export/utils/exportFormatters.ts`
+  - 파일명, 날짜, 작성자 라벨 포맷 처리
+- `frontend/src/features/export/web/exportWord.ts`
+  - 웹 Word export 생성 및 다운로드
+- `frontend/src/features/export/web/exportPdf.ts`
+  - 웹 PDF 생성, 줄바꿈, 페이지 분할, 다운로드
+- `frontend/src/features/export/web/pdfFonts.ts`
+  - PDF용 한글 폰트 로딩/등록
+- `frontend/src/features/export/constants/pdf.ts`
+  - PDF 문서 레이아웃 상수
+
+### Electron 개발 전 정리해야 할 원칙
+
+웹과 Electron은 "같은 문서 데이터"를 쓰되, "최종 저장 방식"은 분리하는 쪽이 유지보수에 유리하다.
+
+권장 원칙:
+
+- 공통:
+  - `ExportDocumentModel`
+  - 정렬/빈 문단 제거/파일명 규칙
+  - 포맷 옵션(`word` / `pdf`, 작성자 라벨 포함 여부)
+- 웹 전용:
+  - Blob 생성
+  - 브라우저 다운로드
+  - `jsPDF` 기반 웹 PDF 출력
+- Electron 전용:
+  - 저장 경로 선택
+  - IPC 요청/응답
+  - 파일 쓰기
+  - 필요 시 `printToPDF()` 사용
+
+즉, "무엇을 export할지"는 공통으로 두고, "어떻게 저장할지"는 플랫폼별로 나눈다.
+
+### Electron Word 개발 권장 방향
+
+Word는 현재 웹 구현이 이미 문서 생성 중심이라 Electron으로 확장하기 비교적 쉽다.
+
+권장 순서:
+
+1. `exportWord.ts` 내부에서 "다운로드"와 "문서 생성"을 분리한다.
+2. 공통 Word Blob 또는 ArrayBuffer 생성 함수를 만든다.
+3. 웹에서는 그 결과를 다운로드에 연결한다.
+4. Electron에서는 IPC로 메인 프로세스에 넘기고 `fs.writeFile`로 저장한다.
+
+권장 분리 예시:
+
+- 공통: `buildWordBlob(documentModel)`
+- 웹: `downloadWordDocument(documentModel)`
+- Electron: `saveWordDocument(documentModel, targetPath)`
+
+### Electron PDF 개발 권장 방향
+
+Electron PDF는 웹과 같은 `jsPDF`를 그대로 재사용할 수도 있지만, 현재 기준으로는 `printToPDF()`가 더 자연스럽다.
+
+이유:
+
+- Electron은 저장 경로 선택과 파일 쓰기를 메인 프로세스에서 자연스럽게 처리할 수 있다.
+- Chromium 인쇄 엔진을 활용하면 Electron 플랫폼 특성에 맞는 PDF 저장 UX를 구성하기 쉽다.
+- 향후 페이지 번호, 머리말/꼬리말, 인쇄 옵션 같은 확장이 필요해질 경우에도 Electron 전용 PDF 흐름이 더 유연할 수 있다.
+
+권장 방향:
+
+1. export 전용 HTML route 또는 숨김 BrowserWindow를 준비한다.
+2. 공통 `ExportDocumentModel`을 해당 뷰에 주입한다.
+3. Electron 메인 프로세스에서 `webContents.printToPDF()`를 호출한다.
+4. `dialog.showSaveDialog()` + `fs.writeFile`로 저장한다.
+
+### Electron PDF에서 웹 `jsPDF`를 그대로 재사용하지 않는 이유
+
+웹 `jsPDF`는 지금 브라우저 다운로드 흐름과 잘 맞는다. 하지만 Electron에서는 아래 차이가 있다.
+
+- 웹은 Blob 다운로드가 자연스럽다.
+- Electron은 파일 저장 경로를 먼저 고르는 UX가 더 자연스럽다.
+- Electron은 Chromium 기반 인쇄 API를 직접 활용할 수 있다.
+- 따라서 Electron PDF는 웹 구현을 그대로 복제하기보다, 공통 문서 모델만 재사용하고 출력 엔진은 별도 선택하는 편이 더 낫다.
+
+### Electron 개발 시작 전에 먼저 할 일
+
+- [ ] IPC export 요청 스펙 정의
+  - 입력: `format`, `ExportDocumentModel`
+  - 출력: 성공/실패, 저장 경로, 에러 메시지
+- [ ] 저장 다이얼로그 정책 정의
+  - 기본 파일명 규칙 재사용
+  - 취소 시 UX 처리
+- [ ] Word용 공통 문서 생성 함수 분리
+- [ ] PDF용 Electron 전용 렌더링 route 또는 hidden window 전략 확정
+- [ ] Electron 에러 처리 정책 정리
+  - 저장 취소
+  - 권한 오류
+  - 파일 쓰기 실패
+  - PDF 렌더 실패
+
+### 체크 상태 업데이트
+
+- [x] 공통 `ExportDocumentModel` 정의
+- [x] `buildExportDocument()` 구현
+- [x] 파일명 규칙 공통화
+- [x] 웹 Word export 구현
+- [x] 웹 PDF export 구현
+- [x] 웹 PDF를 `jsPDF` 기반으로 전환
+- [x] `Noto Sans KR` 폰트 등록 처리
+- [ ] Electron IPC export 구조 설계
+- [ ] Electron Word 저장 구현
+- [ ] Electron PDF 저장 구현
+
+### 최종 권장안
+
+현재 시점의 권장안은 아래와 같다.
+
+1. 웹은 지금 구현된 `jsPDF` 기반 PDF export를 유지한다.
+2. Electron은 공통 `ExportDocumentModel`을 재사용하되 저장 흐름은 별도 설계한다.
+3. Electron Word는 공통 문서 생성 함수 분리 후 파일 저장으로 연결한다.
+4. Electron PDF는 `printToPDF()` 중심으로 설계한다.
+5. 이후 플랫폼별 차이는 "출력 엔진"과 "저장 방식"에만 남기고, 데이터 모델과 옵션은 최대한 공통화한다.
