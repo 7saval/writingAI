@@ -55,10 +55,14 @@ export async function exportWordDocument(documentModel: ExportDocumentModel) {
             const paragraphChildren = documentModel.includeAuthorLabel
               ? [
                   new TextRun({
-                    text: `${formatAuthorLabel(paragraph.writtenBy)}\n`,
+                    // text: `${formatAuthorLabel(paragraph.writtenBy)}\n`,
+                    text: formatAuthorLabel(paragraph.writtenBy),
                     bold: true,
                   }),
-                  new TextRun(paragraph.content),
+                  new TextRun({
+                    text: paragraph.content,
+                    break: 1,
+                  }),
                 ]
               : [new TextRun(paragraph.content)];
 
