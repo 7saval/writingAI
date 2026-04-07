@@ -606,6 +606,11 @@ Week 9: ███░░ 30%
   - `frontend/src/types/electron.d.ts`에 `saveWordDocument` 타입 추가
   - `npm run build --prefix frontend` 통과
   - `cmd /c npx tsc -p tsconfig.electron.json` 통과
+- [x] PDF export 코드리뷰 반영
+  - `frontend/src/features/export/web/exportPdf.ts`에서 수동 `PdfDocument` 타입 제거
+  - `import type { jsPDF } from "jspdf"` 기반 공식 타입으로 교체
+  - `jsPDF`의 `text()`가 baseline 기준으로 동작하는 점을 반영해 제목, 부제, 작성자 라벨, 본문 줄 출력 Y 좌표에 baseline 보정 추가
+  - `npm run build --prefix frontend`로 변경 후 재검증
 
 #### 🧩 해결한 문제
 
@@ -629,6 +634,19 @@ Week 9: ███░░ 30%
 - **결과**
   - "무엇을 export할지"와 "어떻게 저장할지"가 분리돼 구조가 명확해졌다.
 
+**문제 3: PDF export 코드에서 `jspdf` 공식 타입과 실제 텍스트 배치 기준을 충분히 활용하지 못하고 있었다**
+
+- **상황**
+  - `exportPdf.ts`에는 `PdfDocument`라는 수동 타입이 있었는데, 실제 `jspdf` 패키지가 제공하는 타입 정의와 분리돼 있었다.
+  - 또한 `pdf.text()`의 Y 좌표를 줄 top처럼 사용하고 있었지만, `jsPDF`는 baseline 기준으로 텍스트를 배치하므로 상단 여백과 본문 줄 위치가 실제 계산보다 위로 붙을 수 있었다.
+- **해결**
+  - 수동 `PdfDocument` 타입을 제거하고 `import type { jsPDF as JsPdfDocument } from "jspdf"`로 공식 타입을 사용하도록 변경했다.
+  - `getTextBaselineOffset()`를 추가해 `cursorY`는 계속 top 기준으로 유지하고, `text()` 호출 시에만 baseline 보정값을 더하도록 정리했다.
+  - 제목, 부제, 작성자 라벨, 본문 출력에 동일한 기준을 적용했다.
+- **결과**
+  - `jspdf` 메서드 시그니처를 라이브러리 타입과 일치시켜 타입 안정성이 좋아졌다.
+  - PDF 텍스트 배치가 `jsPDF`의 baseline 기준과 맞도록 보정돼 상단 여백 침범 가능성을 줄였다.
+
 #### 🧠 배운 것
 
 **1. Electron export는 렌더러와 메인 프로세스의 책임을 나눌수록 구조가 선명해진다**
@@ -646,6 +664,12 @@ Week 9: ███░░ 30%
 
 - 렌더러에 Electron 전체 API를 직접 열지 않고, 필요한 기능만 `contextBridge.exposeInMainWorld()`로 제한해서 노출할 수 있다.
 - 그래서 `window.electron.saveWordDocument()` 같은 최소 기능만 안전하게 사용할 수 있다.
+
+**4. 문서 레이아웃 코드에서는 "내가 계산하는 좌표 기준"과 "라이브러리가 해석하는 좌표 기준"이 같아야 한다**
+
+- 이번 PDF 코드에서는 `cursorY`를 줄 top처럼 다루고 있었는데, `jsPDF.text()`는 baseline 기준이라 그대로 넘기면 실제 렌더링 위치가 위로 붙는다.
+- 그래서 좌표 계산 레이어에서는 top 기준을 유지하고, 렌더링 호출 직전에 baseline 보정을 더하는 방식이 더 안전했다.
+- 이런 종류의 차이는 타입 오류로는 잘 드러나지 않아서, 라이브러리 동작 규칙을 문서와 코드 양쪽에서 함께 확인하는 습관이 중요하다는 점을 다시 확인했다.
 
 #### 📘 개념정리
 
@@ -682,7 +706,13 @@ Renderer -> Preload -> Main
   - 결과를 기다리지 않는 단방향 이벤트 패턴
   - 예: 알림 표시, 로그 전송, 단순 트리거
 
-**4. `ipcMain.handle`은 언제 쓰는가**
+**4. `jsPDF.text()`의 좌표 기준**
+
+- `jsPDF.text()`에 전달하는 Y 값은 텍스트 박스의 top이 아니라 baseline 기준이다.
+- 따라서 상단 여백이나 줄 시작 위치를 top 기준으로 계산하고 있다면, `text()` 호출 시점에 폰트 높이만큼 baseline 보정을 더해야 실제 텍스트가 예상 위치에 놓인다.
+- 이번 코드에서는 `getTextBaselineOffset(fontSize)`를 추가해 제목, 부제, 작성자 라벨, 본문 줄 출력 모두 같은 기준으로 맞췄다.
+
+**5. `ipcMain.handle`은 언제 쓰는가**
 
 - `ipcMain.handle(channel, handler)`는 렌더러가 `ipcRenderer.invoke(channel, ...args)`로 요청을 보냈을 때, 메인 프로세스가 비동기 작업을 수행하고 결과를 돌려줘야 할 때 쓴다.
 - 즉 "요청-응답" 패턴의 IPC에 적합하다.
@@ -705,13 +735,13 @@ ipcMain.handle("save-word-document", async (_event, filename, data) => {
 });
 ```
 
-**5. `ipcMain.on`은 언제 쓰는가**
+**6. `ipcMain.on`은 언제 쓰는가**
 
 - `ipcMain.on(channel, listener)`는 렌더러가 `ipcRenderer.send(channel, ...args)`로 단방향 이벤트를 보낼 때 쓴다.
 - 결과를 돌려줄 필요가 없는 알림성 이벤트에 적합하다.
 - 이번 코드에서는 `show-notification`이 여기에 해당한다.
 
-**6. 이번 작업의 IPC 흐름**
+**7. 이번 작업의 IPC 흐름**
 
 ```ts
 // renderer
@@ -737,7 +767,7 @@ ipcMain.handle("save-word-document", async (_event, filename, data) => {
 - preload는 이 요청을 안전하게 메인 프로세스로 전달한다.
 - 메인 프로세스는 실제 저장 다이얼로그와 파일 쓰기를 수행하고 결과를 다시 반환한다.
 
-**7. `main.ts`에 쓰인 Electron 모듈 정리**
+**8. `main.ts`에 쓰인 Electron 모듈 정리**
 
 - `app`
   - Electron 앱의 생명주기를 관리한다.
@@ -758,7 +788,7 @@ ipcMain.handle("save-word-document", async (_event, filename, data) => {
   - 앱 전역 단축키를 등록한다.
   - 이번 코드에서는 `CommandOrControl+Shift+A`를 등록하고 종료 시 `unregisterAll()`로 해제한다.
 
-**8. `preload.ts`에 쓰인 Electron 모듈 정리**
+**9. `preload.ts`에 쓰인 Electron 모듈 정리**
 
 - `contextBridge`
   - preload에서 정의한 안전한 API를 렌더러의 `window` 객체에 노출한다.
@@ -771,7 +801,7 @@ ipcMain.handle("save-word-document", async (_event, filename, data) => {
   - IPC 이벤트 리스너의 이벤트 객체 타입이다.
   - TypeScript에서 이벤트 핸들러 인자를 타입 안전하게 다룰 때 사용한다.
 
-**9. 이번 `main.ts`, `preload.ts`에서 Electron 모듈이 실제로 맡은 역할**
+**10. 이번 `main.ts`, `preload.ts`에서 Electron 모듈이 실제로 맡은 역할**
 
 ```ts
 // main.ts

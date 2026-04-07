@@ -1,3 +1,4 @@
+import type { jsPDF as JsPdfDocument } from "jspdf";
 import type { ExportDocumentModel } from "@/features/export/types";
 import {
   buildExportFilename,
@@ -26,28 +27,6 @@ import {
   PARAGRAPH_BOTTOM_SPACING_MM,
 } from "@/features/export/constants/pdf";
 
-type PdfDocument = {
-  addPage(): void;
-  addFileToVFS(filename: string, filecontent: string): void;
-  addFont(
-    postScriptName: string,
-    id: string,
-    fontStyle: "normal" | "bold",
-    fontWeight?: number | string,
-  ): void;
-  output(type: "blob"): Blob;
-  setFont(fontName: string, fontStyle?: "normal" | "bold"): void;
-  setFontSize(size: number): void;
-  setTextColor(ch1: number, ch2?: number, ch3?: number, ch4?: number): void;
-  splitTextToSize(text: string, size: number): string[];
-  text(
-    text: string | string[],
-    x: number,
-    y: number,
-    options?: { align?: "left" | "center" | "right" },
-  ): void;
-};
-
 // 브라우저에서 생성된 PDF Blob을 즉시 다운로드합니다.
 function triggerDownload(blob: Blob, filename: string) {
   const objectUrl = URL.createObjectURL(blob);
@@ -70,8 +49,17 @@ function getTextLineHeight(fontSize: number, lineHeight: number) {
   return pointsToMillimeters(fontSize) * lineHeight;
 }
 
+// jsPDF text()의 Y 좌표는 baseline 기준이므로, 줄 top 좌표를 baseline 좌표로 변환합니다.
+function getTextBaselineOffset(fontSize: number) {
+  return pointsToMillimeters(fontSize);
+}
+
 // 수동 개행을 유지하면서, 각 문단을 페이지 폭에 맞는 줄 목록으로 나눕니다.
-function splitParagraphLines(doc: PdfDocument, text: string, maxWidth: number) {
+function splitParagraphLines(
+  doc: JsPdfDocument,
+  text: string,
+  maxWidth: number,
+) {
   return text.split(/\r?\n/).flatMap((segment) => {
     if (segment.length === 0) {
       return [""];
@@ -83,7 +71,7 @@ function splitParagraphLines(doc: PdfDocument, text: string, maxWidth: number) {
 
 // 현재 페이지에 남은 공간이 부족하면 새 페이지로 넘기고, 새 시작 Y 좌표를 돌려줍니다.
 function ensurePageSpace(
-  doc: PdfDocument,
+  doc: JsPdfDocument,
   yPosition: number,
   requiredHeight: number,
 ) {
@@ -114,9 +102,14 @@ export async function exportPdfDocument(documentModel: ExportDocumentModel) {
   pdf.setFont(pdfFontFamily, "bold");
   pdf.setFontSize(TITLE_FONT_SIZE);
   pdf.setTextColor(17, 24, 39);
-  pdf.text(documentModel.projectTitle, PAGE_WIDTH_MM / 2, PAGE_MARGIN_TOP_MM, {
-    align: "center",
-  });
+  pdf.text(
+    documentModel.projectTitle,
+    PAGE_WIDTH_MM / 2,
+    PAGE_MARGIN_TOP_MM + getTextBaselineOffset(TITLE_FONT_SIZE),
+    {
+      align: "center",
+    },
+  );
 
   let cursorY =
     PAGE_MARGIN_TOP_MM +
@@ -130,7 +123,7 @@ export async function exportPdfDocument(documentModel: ExportDocumentModel) {
   pdf.text(
     formatExportSubtitle(documentModel.exportedAt),
     PAGE_WIDTH_MM / 2,
-    cursorY,
+    cursorY + getTextBaselineOffset(SUBTITLE_FONT_SIZE),
     { align: "center" },
   );
 
@@ -167,7 +160,7 @@ export async function exportPdfDocument(documentModel: ExportDocumentModel) {
       pdf.text(
         formatAuthorLabel(paragraph.writtenBy),
         PAGE_MARGIN_X_MM,
-        cursorY,
+        cursorY + getTextBaselineOffset(AUTHOR_FONT_SIZE),
       );
       cursorY += authorLineHeight + AUTHOR_BOTTOM_SPACING_MM;
     }
@@ -179,7 +172,11 @@ export async function exportPdfDocument(documentModel: ExportDocumentModel) {
     // 본문은 줄 단위로 배치해서 긴 문단도 페이지를 자연스럽게 넘깁니다.
     bodyLines.forEach((line) => {
       cursorY = ensurePageSpace(pdf, cursorY, bodyLineHeight);
-      pdf.text(line.length === 0 ? " " : line, PAGE_MARGIN_X_MM, cursorY);
+      pdf.text(
+        line.length === 0 ? " " : line,
+        PAGE_MARGIN_X_MM,
+        cursorY + getTextBaselineOffset(BODY_FONT_SIZE),
+      );
       cursorY += bodyLineHeight;
     });
 
