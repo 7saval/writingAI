@@ -5,6 +5,7 @@ const electron_1 = require("electron");
 electron_1.contextBridge.exposeInMainWorld("electron", {
     // 1. 파일 내보내기 요청
     exportFile: (format, content) => electron_1.ipcRenderer.invoke("export-file", format, content),
+    saveWordDocument: (filename, data) => electron_1.ipcRenderer.invoke("save-word-document", filename, data),
     // 2. 문서 자동 저장 (DB)
     saveToDb: (docId, content) => electron_1.ipcRenderer.invoke("save-doc", docId, content),
     // 3. 네이티브 알림 표시

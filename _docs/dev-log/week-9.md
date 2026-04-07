@@ -575,3 +575,273 @@ Week 9: ███░░ 30%
 - Electron 쪽 PDF 전략은 웹 `jsPDF`와 별도로 가져갈지, `printToPDF()`를 유지할지 추후 결정 필요
 
 ---
+
+### 📅 2026-04-08 (Day 33)
+
+#### 🎯 오늘 목표
+- [x] Electron Word export 구현 계획 수립
+- [x] 웹 Word 생성 로직을 공통 레이어로 분리
+- [x] Electron 저장용 IPC 추가
+- [x] `Editor`에서 웹/Electron Word export 분기 연결
+- [x] Electron 모듈과 IPC 사용 방식 개념 정리
+
+#### ✅ 완료한 작업
+
+- [x] `_docs/export_guide.md`를 기준으로 Electron Word 우선 구현 계획 정리
+  - 공통 데이터 모델은 유지하고 저장 방식만 플랫폼별로 분리하기로 결정
+  - Word는 웹 구현을 재사용하되 "문서 생성"과 "다운로드/저장"을 분리하는 방향으로 확정
+- [x] Word 문서 생성 공통 레이어 분리
+  - `frontend/src/features/export/word/buildWordDocument.ts` 추가
+  - `frontend/src/features/export/word/buildWordBuffer.ts` 추가
+  - `frontend/src/features/export/web/exportWord.ts`는 공통 ArrayBuffer를 받아 브라우저 다운로드만 담당하도록 정리
+- [x] Electron Word 저장 IPC 구현
+  - `electron/preload.ts`에 `saveWordDocument(filename, data)` 브리지 API 추가
+  - `electron/main.ts`에 `ipcMain.handle("save-word-document", ...)` 추가
+  - 메인 프로세스에서 `dialog.showSaveDialog()`로 저장 위치를 받고 `fs.promises.writeFile()`로 `.docx` 바이너리 저장
+- [x] `Editor.tsx`에서 플랫폼별 Word export 흐름 연결
+  - 웹에서는 기존처럼 다운로드 유지
+  - Electron에서는 `buildWordArrayBuffer()` 결과를 IPC로 전달해 저장
+  - 저장 취소는 실패와 분리해서 조용히 종료하고, 실제 오류만 예외 처리
+- [x] 타입 및 빌드 검증
+  - `frontend/src/types/electron.d.ts`에 `saveWordDocument` 타입 추가
+  - `npm run build --prefix frontend` 통과
+  - `cmd /c npx tsc -p tsconfig.electron.json` 통과
+
+#### 🧩 해결한 문제
+
+**문제 1: 기존 Electron export IPC는 문자열 중심이라 `.docx` 바이너리 저장에 맞지 않았다**
+
+- **상황**
+  - 기존 `export-file` IPC는 `format`, `content` 문자열 기반이라 텍스트나 단순 PDF 흐름에는 맞았지만 Word 바이너리 저장에는 어울리지 않았다.
+- **해결**
+  - `save-word-document` 전용 IPC를 추가했다.
+  - 렌더러에서는 `ArrayBuffer`를 만들고, 메인 프로세스에서는 `Buffer.from(new Uint8Array(data))`로 변환해 파일에 저장했다.
+- **결과**
+  - Electron Word export가 브라우저 다운로드 흐름과 분리된 저장 UX를 갖게 됐다.
+
+**문제 2: Word 문서 생성과 웹 다운로드가 한 파일에 섞여 있어 Electron 재사용이 불편했다**
+
+- **상황**
+  - 기존 `exportWord.ts`는 문서 생성부터 Blob 다운로드까지 모두 담당하고 있었다.
+- **해결**
+  - `buildWordDocument()`와 `buildWordArrayBuffer()`를 분리해 공통 Word 생성 레이어를 만들었다.
+  - 웹은 다운로드만 담당하고, Electron은 같은 결과물을 IPC로 넘겨 저장하게 나눴다.
+- **결과**
+  - "무엇을 export할지"와 "어떻게 저장할지"가 분리돼 구조가 명확해졌다.
+
+#### 🧠 배운 것
+
+**1. Electron export는 렌더러와 메인 프로세스의 책임을 나눌수록 구조가 선명해진다**
+
+- 렌더러는 export 데이터와 사용자 옵션을 준비한다.
+- 메인 프로세스는 저장 경로 선택, 파일 쓰기, OS API 접근을 담당한다.
+- 이번 Word export는 이 경계를 기준으로 나누니 변경 범위가 작고 재사용성이 좋아졌다.
+
+**2. IPC는 응답이 필요한지부터 구분하면 설계가 쉬워진다**
+
+- 저장 다이얼로그, 파일 저장, DB 저장처럼 결과를 반환해야 하는 작업은 `ipcMain.handle` + `ipcRenderer.invoke`가 적합하다.
+- OS 알림처럼 단순 트리거만 필요하면 `ipcMain.on` + `ipcRenderer.send`가 더 단순하다.
+
+**3. preload는 Electron 보안 구조의 핵심 경계면이다**
+
+- 렌더러에 Electron 전체 API를 직접 열지 않고, 필요한 기능만 `contextBridge.exposeInMainWorld()`로 제한해서 노출할 수 있다.
+- 그래서 `window.electron.saveWordDocument()` 같은 최소 기능만 안전하게 사용할 수 있다.
+
+#### 📘 개념정리
+
+**1. IPC란 무엇인가**
+
+- IPC는 `Inter-Process Communication`의 줄임말로, 서로 다른 프로세스가 데이터를 주고받는 방식을 뜻한다.
+- Electron에서는 보통 렌더러 프로세스와 메인 프로세스가 분리되어 있으므로, 렌더러가 운영체제 기능이나 파일 시스템에 직접 접근하지 않고 IPC를 통해 메인 프로세스에 요청을 보낸다.
+- 흐름은 보통 아래처럼 정리된다.
+
+```ts
+Renderer -> Preload -> Main
+```
+
+- `Renderer`
+  - React UI, 사용자 입력, 화면 상태를 담당한다.
+- `Preload`
+  - 렌더러와 메인 사이에서 안전한 브리지 역할을 한다.
+  - 필요한 기능만 `window.electron` 같은 제한된 API로 노출한다.
+- `Main`
+  - `BrowserWindow`, 파일 저장, 다이얼로그, 알림, 전역 단축키 같은 Electron/OS 기능을 담당한다.
+
+**2. Electron에서 IPC가 필요한 이유**
+
+- 보안 때문이다.
+- 현재 프로젝트도 `contextIsolation: true`, `nodeIntegration: false`로 설정되어 있어서 렌더러가 Node.js와 Electron 내부 기능에 직접 접근하지 않는다.
+- 그래서 렌더러가 "저장 다이얼로그를 열어줘", "파일을 저장해줘", "알림을 띄워줘" 같은 요청을 IPC로 메인 프로세스에 전달해야 한다.
+
+**3. IPC의 대표 패턴**
+
+- `ipcRenderer.invoke` <-> `ipcMain.handle`
+  - 응답이 필요한 비동기 요청-응답 패턴
+  - 예: 파일 저장, DB 저장, 경로 선택
+- `ipcRenderer.send` <-> `ipcMain.on`
+  - 결과를 기다리지 않는 단방향 이벤트 패턴
+  - 예: 알림 표시, 로그 전송, 단순 트리거
+
+**4. `ipcMain.handle`은 언제 쓰는가**
+
+- `ipcMain.handle(channel, handler)`는 렌더러가 `ipcRenderer.invoke(channel, ...args)`로 요청을 보냈을 때, 메인 프로세스가 비동기 작업을 수행하고 결과를 돌려줘야 할 때 쓴다.
+- 즉 "요청-응답" 패턴의 IPC에 적합하다.
+- 적합한 경우:
+  - 저장 다이얼로그를 열고 사용자가 고른 경로를 반환해야 할 때
+  - 파일 저장 후 성공/실패를 반환해야 할 때
+  - DB 작업 결과를 렌더러가 기다려야 할 때
+- 이번 코드에서 `ipcMain.handle`이 쓰인 곳:
+  - `export-file`
+  - `save-word-document`
+  - `save-doc`
+
+```ts
+// renderer
+const result = await ipcRenderer.invoke("save-word-document", filename, data);
+
+// main
+ipcMain.handle("save-word-document", async (_event, filename, data) => {
+  return { success: true };
+});
+```
+
+**5. `ipcMain.on`은 언제 쓰는가**
+
+- `ipcMain.on(channel, listener)`는 렌더러가 `ipcRenderer.send(channel, ...args)`로 단방향 이벤트를 보낼 때 쓴다.
+- 결과를 돌려줄 필요가 없는 알림성 이벤트에 적합하다.
+- 이번 코드에서는 `show-notification`이 여기에 해당한다.
+
+**6. 이번 작업의 IPC 흐름**
+
+```ts
+// renderer
+const buffer = await buildWordArrayBuffer(exportDocument);
+await window.electron.saveWordDocument(filename, buffer);
+
+// preload
+saveWordDocument: (filename, data) =>
+  ipcRenderer.invoke("save-word-document", filename, data),
+
+// main
+ipcMain.handle("save-word-document", async (_event, filename, data) => {
+  const { filePath } = await dialog.showSaveDialog(mainWindow, {
+    defaultPath: filename,
+  });
+
+  await fs.promises.writeFile(filePath, Buffer.from(new Uint8Array(data)));
+  return { success: true };
+});
+```
+
+- 렌더러는 Word 바이너리를 만든다.
+- preload는 이 요청을 안전하게 메인 프로세스로 전달한다.
+- 메인 프로세스는 실제 저장 다이얼로그와 파일 쓰기를 수행하고 결과를 다시 반환한다.
+
+**7. `main.ts`에 쓰인 Electron 모듈 정리**
+
+- `app`
+  - Electron 앱의 생명주기를 관리한다.
+  - `whenReady()`, `window-all-closed`, `will-quit`, `setAppUserModelId()` 같은 앱 레벨 동작에 사용한다.
+- `BrowserWindow`
+  - Electron 데스크톱 창을 만든다.
+  - 창 크기, preload 경로, `contextIsolation`, `nodeIntegration` 같은 보안 옵션을 설정하고 페이지를 로드할 때 사용한다.
+- `ipcMain`
+  - 메인 프로세스에서 렌더러의 IPC 요청을 받는다.
+  - `handle()`은 요청-응답, `on()`은 단방향 이벤트 처리에 쓴다.
+- `dialog`
+  - 운영체제의 저장/열기 다이얼로그를 띄운다.
+  - 이번 Word export에서는 `showSaveDialog()`로 저장 위치와 파일명을 받는다.
+- `Notification`
+  - OS 네이티브 알림을 띄운다.
+  - `isSupported()`로 지원 여부를 확인한 뒤 알림 생성과 클릭 이벤트 처리에 사용한다.
+- `globalShortcut`
+  - 앱 전역 단축키를 등록한다.
+  - 이번 코드에서는 `CommandOrControl+Shift+A`를 등록하고 종료 시 `unregisterAll()`로 해제한다.
+
+**8. `preload.ts`에 쓰인 Electron 모듈 정리**
+
+- `contextBridge`
+  - preload에서 정의한 안전한 API를 렌더러의 `window` 객체에 노출한다.
+  - `window.electron`처럼 필요한 기능만 제한적으로 공개할 때 쓴다.
+- `ipcRenderer`
+  - 렌더러 쪽에서 메인 프로세스로 IPC 요청을 보내는 모듈이다.
+  - `invoke()`로 응답이 필요한 요청, `send()`로 단방향 이벤트를 보낸다.
+  - `on()`과 `removeListener()`로 메인 프로세스가 보낸 이벤트를 구독/해제할 수 있다.
+- `IpcRendererEvent`
+  - IPC 이벤트 리스너의 이벤트 객체 타입이다.
+  - TypeScript에서 이벤트 핸들러 인자를 타입 안전하게 다룰 때 사용한다.
+
+**9. 이번 `main.ts`, `preload.ts`에서 Electron 모듈이 실제로 맡은 역할**
+
+```ts
+// main.ts
+app.whenReady(...)
+new BrowserWindow(...)
+ipcMain.handle("save-word-document", ...)
+dialog.showSaveDialog(...)
+new Notification(...)
+globalShortcut.register(...)
+```
+
+- 메인 프로세스는 "창 생성", "OS 기능 접근", "파일 저장", "전역 단축키", "IPC 응답"을 담당한다.
+
+```ts
+// preload.ts
+contextBridge.exposeInMainWorld("electron", {
+  saveWordDocument: (filename, data) =>
+    ipcRenderer.invoke("save-word-document", filename, data),
+  showNotification: (title, body) =>
+    ipcRenderer.send("show-notification", title, body),
+});
+```
+
+- preload는 렌더러가 Electron 내부에 직접 접근하지 않도록 막으면서, 필요한 기능만 안전하게 전달하는 브리지 역할을 한다.
+
+#### 🧾 코드/구조 메모
+
+**Electron Word export 흐름**
+
+```ts
+// renderer
+const buffer = await buildWordArrayBuffer(exportDocument);
+const result = await window.electron.saveWordDocument(filename, buffer);
+```
+
+```ts
+// preload
+saveWordDocument: (filename: string, data: ArrayBuffer) =>
+  ipcRenderer.invoke("save-word-document", filename, data),
+```
+
+```ts
+// main
+ipcMain.handle("save-word-document", async (_event, filename, data) => {
+  const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
+    defaultPath: filename,
+  });
+
+  const buffer = Buffer.from(new Uint8Array(data));
+  await fs.promises.writeFile(filePath, buffer);
+});
+```
+
+- 렌더러: export 데이터와 Word 바이너리 준비
+- preload: 안전한 IPC 호출 창구 제공
+- 메인: 저장 위치 선택과 파일 쓰기 수행
+
+#### 🔜 내일 할 일
+
+- [ ] `npm run electron:dev`에서 실제 Word 저장 다이얼로그와 저장 결과 확인
+- [ ] 저장 취소 시 현재 UX가 적절한지 점검
+- [ ] Electron PDF 구현 방향을 `printToPDF()` 기준으로 구체화
+- [ ] `_docs/export_guide.md`에 Electron Word 구현 상태 반영 검토
+
+#### ❓ 고민/질문
+
+- Word export IPC를 포맷별 전용 채널로 유지할지, 향후 공통 `save-export-document` 스펙으로 통합할지 판단이 필요하다.
+- Electron PDF도 Word처럼 "공통 데이터 + 플랫폼 전용 저장" 패턴은 유지하되, 출력 엔진은 `printToPDF()`로 분리하는 편이 더 자연스러워 보인다.
+
+#### 📊 진행률
+
+Week 9: ▰▰▰▰▱▱▱ 60%
+전체: ▰▰▰▰▰▰▱▱▱▱ 70%
