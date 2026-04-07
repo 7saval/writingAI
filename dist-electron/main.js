@@ -120,6 +120,30 @@ electron_1.ipcMain.handle("export-file", async (event, format, content) => {
         return { success: false, error: String(error) };
     }
 });
+electron_1.ipcMain.handle("save-word-document", async (_event, filename, data) => {
+    if (!mainWindow)
+        return { success: false };
+    const { canceled, filePath } = await electron_1.dialog.showSaveDialog(mainWindow, {
+        title: "문서 내보내기",
+        defaultPath: filename,
+        filters: [
+            { name: "Word", extensions: ["docx"] },
+            { name: "All Files", extensions: ["*"] },
+        ],
+    });
+    if (canceled || !filePath) {
+        return { success: false, canceled: true };
+    }
+    try {
+        const buffer = Buffer.from(new Uint8Array(data));
+        await fs.promises.writeFile(filePath, buffer);
+        return { success: true, path: filePath };
+    }
+    catch (error) {
+        console.error("Word 파일 저장 실패:", error);
+        return { success: false, error: String(error) };
+    }
+});
 electron_1.ipcMain.on("show-notification", (event, title, body) => {
     if (electron_1.Notification.isSupported()) {
         const notification = new electron_1.Notification({ title, body });

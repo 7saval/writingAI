@@ -5,8 +5,10 @@ import ParagraphItem from "@/components/ParagraphItem";
 import { ExportDialog } from "@/features/export/components/ExportDialog";
 import type { ExportDialogValue } from "@/features/export/types";
 import { buildExportDocument } from "@/features/export/utils/buildExportDocument";
+import { buildExportFilename } from "@/features/export/utils/exportFormatters";
 import { exportPdfDocument } from "@/features/export/web/exportPdf";
 import { exportWordDocument } from "@/features/export/web/exportWord";
+import { buildWordArrayBuffer } from "@/features/export/word/buildWordBuffer";
 import { useProjectDetailQuery } from "@/hooks/useProjects";
 import { useProjectParagraphsQuery } from "@/hooks/useParagraphs";
 import { useToast } from "@/hooks/useToast";
@@ -161,7 +163,24 @@ function Editor() {
 
     try {
       if (format === "word") {
-        await exportWordDocument(exportDocument);
+        if (window.electron) {
+          const buffer = await buildWordArrayBuffer(exportDocument);
+          const filename = buildExportFilename(exportDocument, "docx");
+          const result = await window.electron.saveWordDocument(
+            filename,
+            buffer,
+          );
+
+          if (!result.success) {
+            if (result.canceled) {
+              return;
+            }
+
+            throw new Error(result.error ?? "Word document save failed");
+          }
+        } else {
+          await exportWordDocument(exportDocument);
+        }
       } else {
         await exportPdfDocument(exportDocument);
       }

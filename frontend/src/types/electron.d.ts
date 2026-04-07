@@ -8,6 +8,15 @@ export interface ElectronAPI {
     error?: string;
     canceled?: boolean;
   }>;
+  saveWordDocument: (
+    filename: string,
+    data: ArrayBuffer,
+  ) => Promise<{
+    success: boolean;
+    path?: string;
+    error?: string;
+    canceled?: boolean;
+  }>;
   saveToDb: (docId: string, content: string) => Promise<{ success: boolean }>;
   showNotification: (title: string, body: string) => void;
   onShortcutPressed: (callback: (action: string) => void) => () => void;

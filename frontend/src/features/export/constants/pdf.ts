@@ -1,0 +1,50 @@
+// A4 세로 문서의 실제 페이지 크기(mm)입니다.
+const PAGE_WIDTH_MM = 210;
+const PAGE_HEIGHT_MM = 297;
+
+// 본문이 붙지 않도록 좌우/상하에 확보하는 문서 여백(mm)입니다.
+const PAGE_MARGIN_X_MM = 20;
+const PAGE_MARGIN_TOP_MM = 22;
+const PAGE_MARGIN_BOTTOM_MM = 22;
+
+// 실제 텍스트가 배치될 수 있는 가로 영역 너비(mm)입니다.
+const CONTENT_WIDTH_MM = PAGE_WIDTH_MM - PAGE_MARGIN_X_MM * 2;
+
+// 제목, 부제, 작성자 라벨, 본문에 사용하는 폰트 크기(pt)입니다.
+const TITLE_FONT_SIZE = 20;
+const SUBTITLE_FONT_SIZE = 10;
+const AUTHOR_FONT_SIZE = 9;
+const BODY_FONT_SIZE = 11;
+
+// 각 텍스트 블록의 줄간격 배수입니다.
+const TITLE_LINE_HEIGHT = 1.35;
+const SUBTITLE_LINE_HEIGHT = 1.5;
+const AUTHOR_LINE_HEIGHT = 1.3;
+const BODY_LINE_HEIGHT = 1.75;
+
+// 블록 사이에 추가로 주는 세로 간격(mm)입니다.
+const TITLE_BOTTOM_SPACING_MM = 6;
+const SUBTITLE_BOTTOM_SPACING_MM = 14;
+const AUTHOR_BOTTOM_SPACING_MM = 4;
+const PARAGRAPH_BOTTOM_SPACING_MM = 8;
+
+export {
+  PAGE_WIDTH_MM,
+  PAGE_HEIGHT_MM,
+  PAGE_MARGIN_X_MM,
+  PAGE_MARGIN_TOP_MM,
+  PAGE_MARGIN_BOTTOM_MM,
+  CONTENT_WIDTH_MM,
+  TITLE_FONT_SIZE,
+  SUBTITLE_FONT_SIZE,
+  AUTHOR_FONT_SIZE,
+  BODY_FONT_SIZE,
+  TITLE_LINE_HEIGHT,
+  SUBTITLE_LINE_HEIGHT,
+  AUTHOR_LINE_HEIGHT,
+  BODY_LINE_HEIGHT,
+  TITLE_BOTTOM_SPACING_MM,
+  SUBTITLE_BOTTOM_SPACING_MM,
+  AUTHOR_BOTTOM_SPACING_MM,
+  PARAGRAPH_BOTTOM_SPACING_MM,
+};

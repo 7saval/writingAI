@@ -5,6 +5,8 @@ contextBridge.exposeInMainWorld("electron", {
   // 1. 파일 내보내기 요청
   exportFile: (format: string, content: string) =>
     ipcRenderer.invoke("export-file", format, content),
+  saveWordDocument: (filename: string, data: ArrayBuffer) =>
+    ipcRenderer.invoke("save-word-document", filename, data),
   // 2. 문서 자동 저장 (DB)
   saveToDb: (docId: string, content: string) =>
     ipcRenderer.invoke("save-doc", docId, content),
