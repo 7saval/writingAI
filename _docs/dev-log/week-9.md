@@ -966,6 +966,126 @@ Week 9: ▰▰▰▰▱▱▱ 60%
 - 반대로 이를 완전히 풀면 라벨과 본문 결속이 약해질 수 있다.
 - 결국 문단 전체를 묶는 것이 아니라 라벨과 본문 시작만 붙들기처럼 더 작은 단위로 제어하는 편이 품질이 좋았다.
 
+#### 라우팅 트러블슈팅
+
+**문제: `file://` 환경에서 hidden window가 `/export/pdf` route에 안정적으로 진입해야 했다**
+
+- 상황
+  - 처음 구현에서는 hidden window가 `file://.../index.html`을 먼저 연 뒤, `loadPdfExportRoute()` 안에서 `window.history.replaceState({}, "", "/export/pdf")`와 `PopStateEvent("popstate")`를 수동으로 발생시켜 export route로 이동시켰다.
+  - 로컬에서는 동작하는 것처럼 보여도, 이 방식은 React Router가 언제 초기화되는지에 따라 `popstate` 이벤트가 먼저 지나가 버릴 수 있다.
+  - 즉 "라우터가 준비된 뒤 경로를 읽는 구조"가 아니라 "라우터가 준비되기 전에 이벤트를 던져도 운 좋게 받으면 동작하는 구조"에 가까웠다.
+
+**검토한 대안 1: Electron에서만 Hash Router 사용**
+
+- 방식
+  - Electron 렌더러에서는 `createHashRouter`를 사용한다.
+  - hidden window는 `file://.../index.html#/export/pdf` 또는 개발 환경에서 `http://localhost:5173#/export/pdf`로 바로 진입한다.
+- 장점
+  - 라우터가 첫 렌더 시점부터 `#/export/pdf`를 읽기 때문에 별도의 history 조작이나 수동 이벤트가 필요 없다.
+  - `file://` 환경과 잘 맞는다. 정적 `index.html` 하나만 열고도 hash 뒤 경로를 안정적으로 표현할 수 있다.
+  - hidden window뿐 아니라 Electron 메인 창도 같은 규칙을 따라가므로 라우팅 규칙이 단순해진다.
+  - "처음 로드한 URL 자체가 export route"이기 때문에 초기화 순서에 덜 민감하다.
+- 단점
+  - 웹 배포(Vercel)와 Electron이 서로 다른 라우터 전략을 쓰게 된다.
+  - 따라서 `App.tsx`에서 Electron 여부에 따라 `BrowserRouter`와 `HashRouter`를 분기해야 한다.
+
+**검토한 대안 2: URL 파라미터로 초기 경로 전달**
+
+- 방식
+  - hidden window를 `file://.../index.html?initialRoute=/export/pdf`처럼 연다.
+  - 앱 시작 시 `window.location.search`를 읽어서 라우터가 초기 route를 결정하게 만든다.
+- 장점
+  - 수동 `replaceState`/`popstate`보다 안정적이다. 경로가 이벤트가 아니라 "초기 입력값"으로 전달되기 때문이다.
+  - 해시를 URL에 노출하지 않고도 초기 진입 경로를 전달할 수 있다.
+- 단점
+  - 현재 `createBrowserRouter(routeList)` 구조를 더 많이 감싸야 한다.
+  - 초기 route를 search param에서 읽어 라우터 state에 반영하는 별도 부트스트랩 코드가 필요하다.
+  - 브라우저 웹 배포와 Electron의 초기 진입 규칙이 또 한 번 갈라지기 때문에, 장기적으로는 "라우터는 BrowserRouter인데 일부 창만 query로 우회 진입"이라는 또 다른 예외가 생긴다.
+
+**왜 1안을 선택했는가**
+
+- 첫 번째 이유는 안정성이다.
+  - 이번 문제의 핵심은 "초기화 시점에 따라 이벤트가 유실될 수 있느냐"였고, Hash Router는 아예 이벤트 전달에 기대지 않는다.
+  - hidden window가 처음 로드하는 URL 자체가 `#/export/pdf`이므로, React Router는 부팅 직후 현재 location을 그대로 읽으면 된다.
+  - 즉, route 변경을 나중에 밀어 넣는 방식이 아니라 "처음부터 올바른 route에서 시작"하는 방식이라 운영 중 재현하기 어려운 타이밍 이슈를 줄이기 쉽다.
+
+- 두 번째 이유는 `file://` 환경 적합성이다.
+  - Electron 배포본은 결국 정적 `index.html`을 `file://`로 여는 구조라서, 서버가 없는 환경에서 path 기반 라우팅보다 hash 기반 라우팅이 훨씬 자연스럽다.
+  - `#/export/pdf`는 파일 경로 해석과 충돌하지 않지만, `/export/pdf`는 브라우저 히스토리 경로처럼 보이기 때문에 매번 별도 우회가 필요하다.
+
+- 세 번째 이유는 구현 복잡도 대비 효과가 가장 좋았기 때문이다.
+  - Hash Router로 바꾸면 `main.ts`에서는 `loadURL(...#/export/pdf)`만 호출하면 된다.
+  - 반면 query parameter 방식은 초기 경로 해석, 라우터 생성 시점 주입, 앱 시작 부트스트랩 분기까지 손댈 곳이 더 많다.
+  - 이번 수정의 목적은 "PDF export hidden window 진입 안정화"였기 때문에, 가장 적은 변경으로 가장 큰 불확실성을 제거하는 쪽이 맞았다.
+
+- 네 번째 이유는 유지보수성이다.
+  - Electron 앱 전체를 "Electron에서는 hash route"라는 규칙 하나로 설명할 수 있게 된다.
+  - hidden window만 특별 취급하지 않아도 되어서, 나중에 다른 Electron 전용 창을 추가할 때도 같은 패턴을 재사용할 수 있다.
+  - 예외 규칙이 줄어들수록 디버깅 비용도 낮아진다.
+
+- 다섯 번째 이유는 웹 배포와의 경계가 명확했기 때문이다.
+  - 웹(Vercel)은 여전히 `BrowserRouter`가 자연스럽고, Electron은 `file://` 제약 때문에 `HashRouter`가 더 적합하다.
+  - 두 환경의 제약이 다르기 때문에, 하나의 라우팅 전략을 억지로 공통화하기보다 환경에 맞는 전략을 분리하는 편이 더 합리적이었다.
+
+- 결과
+  - `main.ts`의 `replaceState`/`popstate` 우회를 제거했다.
+  - Electron에서는 `createHashRouter`, 웹에서는 `createBrowserRouter`를 사용하도록 변경했다.
+  - hidden PDF export window는 개발/배포 환경 모두 `#/export/pdf`로 직접 진입하게 바꿨다.
+
+#### Hash Router 개념 정리
+
+**Hash Router는 무엇인가**
+
+- URL의 `#` 뒤쪽 값을 라우팅 경로로 해석하는 방식이다.
+- 예를 들면 `http://localhost:5173#/export/pdf`에서 실제 라우팅 경로는 `#/export/pdf` 부분이다.
+- 브라우저는 `#` 뒤를 서버에 다시 요청하지 않고, 현재 페이지 안에서만 상태처럼 다룬다.
+
+**기존 Browser Router와 무엇이 다른가**
+
+- Browser Router
+  - `/export/pdf`처럼 일반 경로를 그대로 사용한다.
+  - 브라우저 주소창이 더 깔끔하고, 일반 웹 서비스 URL처럼 보인다.
+  - 대신 사용자가 `/export/pdf`로 직접 진입했을 때 서버가 그 경로 요청도 `index.html`로 돌려줘야 한다.
+  - 즉 서버 설정과 같이 움직이는 라우팅 방식이다.
+
+- Hash Router
+  - `#/export/pdf`처럼 `#` 뒤 경로를 사용한다.
+  - 서버는 항상 `index.html` 하나만 열면 되고, 실제 화면 분기는 브라우저 안의 JS 라우터가 처리한다.
+  - 주소가 조금 덜 깔끔하지만, 정적 파일 환경이나 `file://` 환경에서 더 단순하고 안정적으로 동작한다.
+  - 즉 서버 도움 없이도 동작하기 쉬운 라우팅 방식이다.
+
+**왜 웹에서는 Browser Router가 자연스럽고, Electron에서는 Hash Router가 유리한가**
+
+- 웹 배포 환경
+  - Vercel 같은 정적 호스팅은 SPA fallback만 맞추면 `/projects`, `/export/pdf` 같은 경로를 Browser Router로 자연스럽게 운영할 수 있다.
+  - 사용자가 링크를 새 탭으로 열거나 새로고침해도 서버가 다시 `index.html`을 내려주면 된다.
+
+- Electron 배포 환경
+  - Electron은 결국 `file://.../index.html`을 여는 구조라서 서버가 없다.
+  - 이 상태에서 `/export/pdf` 같은 path 기반 route는 파일 시스템 경로처럼 해석되거나 별도 우회가 필요하다.
+  - 반면 `#/export/pdf`는 실제 파일 경로를 건드리지 않기 때문에 `index.html` 하나만 열어도 안정적으로 route를 표현할 수 있다.
+
+**이번 작업 기준으로 보면 차이가 더 분명하다**
+
+- Browser Router 기준 hidden window
+  - `file://.../index.html`을 연 다음
+  - 나중에 `replaceState("/export/pdf")`
+  - 그리고 `popstate` 이벤트를 수동으로 보내 route 이동을 유도해야 했다.
+  - 이 방식은 라우터 초기화 시점에 따라 이벤트가 유실될 수 있었다.
+
+- Hash Router 기준 hidden window
+  - 처음부터 `file://.../index.html#/export/pdf`로 연다.
+  - 라우터는 첫 렌더 시점에 현재 URL의 hash 값을 그대로 읽는다.
+  - 별도 history 조작이나 수동 이벤트가 필요 없다.
+  - 즉 "초기 route 이동"이 아니라 "올바른 route에서 시작"하는 구조가 된다.
+
+**정리**
+
+- Browser Router는 서버와 협력해서 깔끔한 path URL을 운영하는 방식이다.
+- Hash Router는 서버 도움 없이 현재 페이지 안에서 route를 관리하는 방식이다.
+- 이번 Electron PDF hidden window처럼 `file://` 기반, 서버 없음, 초기 진입 안정성이 중요한 경우에는 Hash Router가 더 잘 맞는다.
+- 그래서 웹은 `createBrowserRouter`, Electron은 `createHashRouter`로 분리하는 쪽이 이번 프로젝트 제약에 가장 자연스러웠다.
+
 #### Electron PDF 흐름 도식
 
 ```text

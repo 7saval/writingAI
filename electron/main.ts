@@ -110,16 +110,12 @@ function buildPdfFooterTemplate(document: ExportDocumentPayload) {
 async function loadPdfExportRoute(exportWindow: BrowserWindow) {
   if (process.env.ELECTRON_START_URL) {
     // 개발 환경은 dev server에 직접 export route를 붙여서 로드합니다.
-    await exportWindow.loadURL(`${rendererEntryUrl}/export/pdf`);
+    await exportWindow.loadURL(`${rendererEntryUrl}#/export/pdf`);
     return;
   }
 
   // file:// 환경에서는 새 창에서 직접 route 진입이 불안정할 수 있어 먼저 앱을 띄운 뒤 주소만 교체합니다.
-  await exportWindow.loadURL(rendererEntryUrl);
-  await exportWindow.webContents.executeJavaScript(`
-    window.history.replaceState({}, "", "/export/pdf");
-    window.dispatchEvent(new PopStateEvent("popstate"));
-  `);
+  await exportWindow.loadURL(`${rendererEntryUrl}#/export/pdf`);
 }
 
 function waitForPdfExportReady(webContents: WebContents, timeoutMs = 15000) {
