@@ -48,6 +48,7 @@ function ExportPdfPage() {
       return;
     }
 
+    const currentDocumentModel = documentModel;
     let active = true;
 
     async function notifyWhenRendered() {
@@ -60,7 +61,7 @@ function ExportPdfPage() {
 
       const renderedParagraphs = renderedDocument.querySelectorAll("section");
 
-      if (renderedParagraphs.length !== documentModel.paragraphs.length) {
+      if (renderedParagraphs.length !== currentDocumentModel.paragraphs.length) {
         return;
       }
 
