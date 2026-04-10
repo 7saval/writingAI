@@ -12,7 +12,9 @@ const router = createBrowserRouter(
   routeList.map((item) => {
     return {
       ...item,
-      element: <Layout>{item.element}</Layout>,
+      // export route는 앱 chrome 없이 인쇄 전용 문서만 보여야 해서 Layout을 건너뜁니다.
+      element:
+        item.useLayout === false ? item.element : <Layout>{item.element}</Layout>,
       errorElement: <Error />,
     };
   }),

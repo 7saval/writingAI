@@ -6,6 +6,7 @@ import WritingSession from "@/pages/WritingSession";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import ResetPassword from "@/pages/auth/ResetPassword";
 import ExtraInfo from "@/pages/auth/ExtraInfo";
+import ExportPdfPage from "@/pages/ExportPdfPage";
 
 export const routeList = [
     {
@@ -47,5 +48,11 @@ export const routeList = [
                 <WritingSession />
             </ProtectedRoute>
         )
+    },
+    {
+        path: "/export/pdf",
+        // hidden Electron window가 이 route를 열어 PDF 전용 문서를 렌더링합니다.
+        element: <ExportPdfPage />,
+        useLayout: false,
     }
 ]

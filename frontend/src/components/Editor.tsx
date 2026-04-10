@@ -49,7 +49,9 @@ function Editor() {
   }, [paragraphs]);
 
   const handleSubmit = async () => {
-    if (!input.trim() || !projectId) return;
+    if (!input.trim() || !projectId) {
+      return;
+    }
 
     const userInput = input;
     const currentDirective = aiDirective;
@@ -93,10 +95,14 @@ function Editor() {
 
       setParagraphs((prev) =>
         prev.map((paragraph) => {
-          if (paragraph.id === tempUserId) return response.userParagraph;
+          if (paragraph.id === tempUserId) {
+            return response.userParagraph;
+          }
+
           if (paragraph.id === tempAiId) {
             return { ...response.aiParagraph, isTyping: true };
           }
+
           return paragraph;
         }),
       );
@@ -108,7 +114,7 @@ function Editor() {
         }),
       );
       setInput(userInput);
-      await showAlert("문단 작성에 실패했습니다. 다시 시도해 주세요.");
+      await showAlert("문단 생성에 실패했습니다. 다시 시도해 주세요.");
     } finally {
       setIsLoading(false);
     }
@@ -181,14 +187,35 @@ function Editor() {
         } else {
           await exportWordDocument(exportDocument);
         }
+      } else if (window.electron) {
+        // Electron PDF는 브라우저 다운로드 대신 메인 프로세스의 hidden window print 흐름으로 보냅니다.
+        const filename = buildExportFilename(exportDocument, "pdf");
+        const result = await window.electron.savePdfDocument(
+          filename,
+          exportDocument,
+        );
+
+        if (!result.success) {
+          if (result.canceled) {
+            return;
+          }
+
+          throw new Error(result.error ?? "PDF document save failed");
+        }
       } else {
         await exportPdfDocument(exportDocument);
       }
 
+      // 같은 export 액션이라도 웹은 다운로드, Electron은 저장 다이얼로그 기반이라 안내 문구를 나눕니다.
+      const isElectron = Boolean(window.electron);
+
       toast({
         title: format === "word" ? "Word 내보내기 완료" : "PDF 내보내기 완료",
-        description:
-          format === "word"
+        description: isElectron
+          ? format === "word"
+            ? "Word 문서가 저장되었습니다."
+            : "PDF 문서가 저장되었습니다."
+          : format === "word"
             ? "Word 문서 다운로드가 시작되었습니다."
             : "PDF 문서 다운로드가 시작되었습니다.",
       });
@@ -253,7 +280,7 @@ function Editor() {
             onClick={handleSubmit}
             type="button"
           >
-            {isLoading ? "AI 작성 중..." : "문단 전송"}
+            {isLoading ? "AI 작성 중.." : "문단 전송"}
           </button>
         </div>
       </section>
