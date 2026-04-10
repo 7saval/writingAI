@@ -875,3 +875,302 @@ ipcMain.handle("save-word-document", async (_event, filename, data) => {
 
 Week 9: ▰▰▰▰▱▱▱ 60%
 전체: ▰▰▰▰▰▰▱▱▱▱ 70%
+
+---
+
+### 2026-04-10 (Day 34)
+
+#### 오늘 목표
+
+- [x] Electron PDF 구현 방향을 `printToPDF()` 기준으로 구체화
+- [x] Electron PDF 렌더링 방식을 `hidden BrowserWindow + export route`로 확정
+- [x] Electron PDF에서 웹과 최대한 동일한 시각 결과를 목표로 확정
+- [x] Electron PDF 1차 범위에 페이지 번호, 머리말, 꼬리말 포함 확정
+- [x] layout 없는 export route 지원 방식 결정 및 반영
+- [x] `save-pdf-document` IPC 계약 추가
+- [x] hidden window payload 주입 방식 구현
+- [x] `printToPDF()` header/footer 템플릿 1차 구현
+- [x] `_docs/export_guide.md` 최신화
+
+#### 완료한 작업
+
+- [x] `routeList`와 `App.tsx`를 조정해 `/export/pdf` route를 `Layout` 없이 렌더링하도록 반영
+- [x] `frontend/src/types/electron.d.ts`, `electron/preload.ts`에 PDF 저장, payload 조회, ready 알림 브리지 추가
+- [x] `electron/main.ts`에 `save-pdf-document` IPC와 hidden `BrowserWindow` 기반 저장 흐름 구현
+- [x] `ExportPdfPage.tsx`, `ExportPdfDocument.tsx`를 추가해 PDF 전용 렌더링 화면 구성
+- [x] `Editor.tsx`에서 웹 PDF와 Electron PDF 저장 흐름 분기 연결
+- [x] `printToPDF()` header/footer 템플릿으로 프로젝트 제목, export 날짜, 페이지 번호 출력
+- [x] `npm run build --prefix frontend` 통과
+- [x] `cmd /c npx tsc -p tsconfig.electron.json` 통과
+
+#### 해결한 문제
+
+**문제 1: Electron PDF에서 제목은 보이는데 본문 내용이 보이지 않는 문제가 있었다**
+
+- 상황
+  - hidden window가 `/export/pdf` route를 열고 있었지만, payload를 state에 세팅한 직후 너무 빨리 ready 신호를 보내고 있었다.
+  - 그 결과 실제 문단 DOM이 완전히 렌더되기 전에 `printToPDF()`가 실행될 수 있었다.
+- 해결
+  - `ExportPdfPage.tsx`에서 payload 로드와 렌더 완료 신호를 분리했다.
+  - 첫 번째 effect는 payload만 `documentModel` state에 올린다.
+  - 두 번째 effect는 `.export-pdf-page`와 문단 `section` 렌더링 여부를 확인한 뒤 `document.fonts.ready`, 2번의 `requestAnimationFrame`까지 기다리고 나서 `notifyPdfExportReady()`를 호출하도록 변경했다.
+- 결과
+  - PDF 본문이 정상적으로 출력되기 시작했다.
+
+**문제 2: 페이지 이동 시 페이지 하단에 너무 많은 공백이 생겼다**
+
+- 상황
+  - 문단 블록 전체에 `break-inside: avoid`를 적용해 두었고, 이 때문에 다음 문단이 페이지 끝에 안 들어가면 문단 전체가 다음 페이지로 넘어가면서 큰 빈 공간이 생겼다.
+- 해결
+  - 문단 `section`의 `breakInside`를 `auto`로 변경했다.
+  - `@media print` 안에서도 `section`에 `break-inside: auto`, `page-break-inside: auto`를 적용했다.
+- 결과
+  - 본문이 페이지 끝에서 더 자연스럽게 이어지고 페이지 하단 공백이 줄었다.
+
+**문제 3: 작성자 라벨이 페이지 맨 아래에 혼자 떨어질 수 있었다**
+
+- 상황
+  - 문단 전체를 강제로 묶지 않도록 바꾼 뒤에는, 반대로 라벨만 페이지 마지막 줄에 남고 본문이 다음 페이지로 넘어갈 수 있는 상태가 되었다.
+- 해결
+  - 라벨 스타일에 `break-after: avoid`, `page-break-after: avoid`를 추가했다.
+  - 본문에는 `orphans`, `widows`를 추가해 문단 첫 줄과 마지막 줄이 지나치게 어색하게 잘리지 않도록 완화했다.
+- 결과
+  - 라벨과 본문 시작이 더 자연스럽게 붙어 다니는 쪽으로 개선됐다.
+
+#### 배운 점
+
+**1. Electron PDF는 데이터 준비와 인쇄 준비를 분리해야 안정적이다**
+
+- 렌더러는 export 문서 모델을 준비한다.
+- 메인 프로세스는 hidden window를 띄워 인쇄를 담당한다.
+- export route는 문서가 다 그려졌는지를 보장하는 역할을 맡는다.
+- 이 셋을 나누니 디버깅 포인트가 명확해졌다.
+
+**왜 `hidden window` 기반 PDF 저장 방식을 택했는가**
+
+- `printToPDF()`는 현재 렌더된 페이지를 그대로 PDF로 만들기 때문에, 편집 UI가 섞이지 않은 인쇄 전용 화면이 필요했다.
+- 메인 에디터 화면을 그대로 찍으면 툴바, 스크롤 상태, hover UI 같은 앱 상태가 PDF 결과에 영향을 줄 수 있다.
+- hidden `BrowserWindow`를 따로 두면 export 전용 route만 로드해서 제목, 부제, 본문, 작성자 라벨, 여백, 페이지 번호를 독립적으로 제어할 수 있다.
+- 웹 PDF와 최대한 비슷한 시각 결과를 유지하려면 “현재 작업 화면”이 아니라 “PDF용 문서 화면”을 분리하는 편이 훨씬 안정적이었다.
+- 저장 흐름도 메인 프로세스에서 `showSaveDialog()`와 `printToPDF()`를 한 번에 묶어 처리할 수 있어서 Electron UX와 잘 맞았다.
+
+**2. `printToPDF()`는 단순 저장 API가 아니라 현재 렌더된 문서 상태에 매우 민감하다**
+
+- payload가 있어도 DOM이 다 그려지지 않으면 빈 PDF가 나올 수 있다.
+- 폰트 로딩과 paint 타이밍까지 기다려야 실제 화면과 가까운 결과를 얻을 수 있다.
+- 그래서 ready 신호 기준을 state 세팅 완료가 아니라 문서 렌더 완료로 두는 것이 중요했다.
+
+**3. 페이지 분할 품질은 CSS 한 줄 차이에도 크게 달라진다**
+
+- `break-inside: avoid`는 보기엔 안전해 보여도 긴 문서에서는 공백을 키울 수 있다.
+- 반대로 이를 완전히 풀면 라벨과 본문 결속이 약해질 수 있다.
+- 결국 문단 전체를 묶는 것이 아니라 라벨과 본문 시작만 붙들기처럼 더 작은 단위로 제어하는 편이 품질이 좋았다.
+
+#### 라우팅 트러블슈팅
+
+**문제: `file://` 환경에서 hidden window가 `/export/pdf` route에 안정적으로 진입해야 했다**
+
+- 상황
+  - 처음 구현에서는 hidden window가 `file://.../index.html`을 먼저 연 뒤, `loadPdfExportRoute()` 안에서 `window.history.replaceState({}, "", "/export/pdf")`와 `PopStateEvent("popstate")`를 수동으로 발생시켜 export route로 이동시켰다.
+  - 로컬에서는 동작하는 것처럼 보여도, 이 방식은 React Router가 언제 초기화되는지에 따라 `popstate` 이벤트가 먼저 지나가 버릴 수 있다.
+  - 즉 "라우터가 준비된 뒤 경로를 읽는 구조"가 아니라 "라우터가 준비되기 전에 이벤트를 던져도 운 좋게 받으면 동작하는 구조"에 가까웠다.
+
+**검토한 대안 1: Electron에서만 Hash Router 사용**
+
+- 방식
+  - Electron 렌더러에서는 `createHashRouter`를 사용한다.
+  - hidden window는 `file://.../index.html#/export/pdf` 또는 개발 환경에서 `http://localhost:5173#/export/pdf`로 바로 진입한다.
+- 장점
+  - 라우터가 첫 렌더 시점부터 `#/export/pdf`를 읽기 때문에 별도의 history 조작이나 수동 이벤트가 필요 없다.
+  - `file://` 환경과 잘 맞는다. 정적 `index.html` 하나만 열고도 hash 뒤 경로를 안정적으로 표현할 수 있다.
+  - hidden window뿐 아니라 Electron 메인 창도 같은 규칙을 따라가므로 라우팅 규칙이 단순해진다.
+  - "처음 로드한 URL 자체가 export route"이기 때문에 초기화 순서에 덜 민감하다.
+- 단점
+  - 웹 배포(Vercel)와 Electron이 서로 다른 라우터 전략을 쓰게 된다.
+  - 따라서 `App.tsx`에서 Electron 여부에 따라 `BrowserRouter`와 `HashRouter`를 분기해야 한다.
+
+**검토한 대안 2: URL 파라미터로 초기 경로 전달**
+
+- 방식
+  - hidden window를 `file://.../index.html?initialRoute=/export/pdf`처럼 연다.
+  - 앱 시작 시 `window.location.search`를 읽어서 라우터가 초기 route를 결정하게 만든다.
+- 장점
+  - 수동 `replaceState`/`popstate`보다 안정적이다. 경로가 이벤트가 아니라 "초기 입력값"으로 전달되기 때문이다.
+  - 해시를 URL에 노출하지 않고도 초기 진입 경로를 전달할 수 있다.
+- 단점
+  - 현재 `createBrowserRouter(routeList)` 구조를 더 많이 감싸야 한다.
+  - 초기 route를 search param에서 읽어 라우터 state에 반영하는 별도 부트스트랩 코드가 필요하다.
+  - 브라우저 웹 배포와 Electron의 초기 진입 규칙이 또 한 번 갈라지기 때문에, 장기적으로는 "라우터는 BrowserRouter인데 일부 창만 query로 우회 진입"이라는 또 다른 예외가 생긴다.
+
+**왜 1안을 선택했는가**
+
+- 첫 번째 이유는 안정성이다.
+  - 이번 문제의 핵심은 "초기화 시점에 따라 이벤트가 유실될 수 있느냐"였고, Hash Router는 아예 이벤트 전달에 기대지 않는다.
+  - hidden window가 처음 로드하는 URL 자체가 `#/export/pdf`이므로, React Router는 부팅 직후 현재 location을 그대로 읽으면 된다.
+  - 즉, route 변경을 나중에 밀어 넣는 방식이 아니라 "처음부터 올바른 route에서 시작"하는 방식이라 운영 중 재현하기 어려운 타이밍 이슈를 줄이기 쉽다.
+
+- 두 번째 이유는 `file://` 환경 적합성이다.
+  - Electron 배포본은 결국 정적 `index.html`을 `file://`로 여는 구조라서, 서버가 없는 환경에서 path 기반 라우팅보다 hash 기반 라우팅이 훨씬 자연스럽다.
+  - `#/export/pdf`는 파일 경로 해석과 충돌하지 않지만, `/export/pdf`는 브라우저 히스토리 경로처럼 보이기 때문에 매번 별도 우회가 필요하다.
+
+- 세 번째 이유는 구현 복잡도 대비 효과가 가장 좋았기 때문이다.
+  - Hash Router로 바꾸면 `main.ts`에서는 `loadURL(...#/export/pdf)`만 호출하면 된다.
+  - 반면 query parameter 방식은 초기 경로 해석, 라우터 생성 시점 주입, 앱 시작 부트스트랩 분기까지 손댈 곳이 더 많다.
+  - 이번 수정의 목적은 "PDF export hidden window 진입 안정화"였기 때문에, 가장 적은 변경으로 가장 큰 불확실성을 제거하는 쪽이 맞았다.
+
+- 네 번째 이유는 유지보수성이다.
+  - Electron 앱 전체를 "Electron에서는 hash route"라는 규칙 하나로 설명할 수 있게 된다.
+  - hidden window만 특별 취급하지 않아도 되어서, 나중에 다른 Electron 전용 창을 추가할 때도 같은 패턴을 재사용할 수 있다.
+  - 예외 규칙이 줄어들수록 디버깅 비용도 낮아진다.
+
+- 다섯 번째 이유는 웹 배포와의 경계가 명확했기 때문이다.
+  - 웹(Vercel)은 여전히 `BrowserRouter`가 자연스럽고, Electron은 `file://` 제약 때문에 `HashRouter`가 더 적합하다.
+  - 두 환경의 제약이 다르기 때문에, 하나의 라우팅 전략을 억지로 공통화하기보다 환경에 맞는 전략을 분리하는 편이 더 합리적이었다.
+
+- 결과
+  - `main.ts`의 `replaceState`/`popstate` 우회를 제거했다.
+  - Electron에서는 `createHashRouter`, 웹에서는 `createBrowserRouter`를 사용하도록 변경했다.
+  - hidden PDF export window는 개발/배포 환경 모두 `#/export/pdf`로 직접 진입하게 바꿨다.
+
+#### Hash Router 개념 정리
+
+**Hash Router는 무엇인가**
+
+- URL의 `#` 뒤쪽 값을 라우팅 경로로 해석하는 방식이다.
+- 예를 들면 `http://localhost:5173#/export/pdf`에서 실제 라우팅 경로는 `#/export/pdf` 부분이다.
+- 브라우저는 `#` 뒤를 서버에 다시 요청하지 않고, 현재 페이지 안에서만 상태처럼 다룬다.
+
+**기존 Browser Router와 무엇이 다른가**
+
+- Browser Router
+  - `/export/pdf`처럼 일반 경로를 그대로 사용한다.
+  - 브라우저 주소창이 더 깔끔하고, 일반 웹 서비스 URL처럼 보인다.
+  - 대신 사용자가 `/export/pdf`로 직접 진입했을 때 서버가 그 경로 요청도 `index.html`로 돌려줘야 한다.
+  - 즉 서버 설정과 같이 움직이는 라우팅 방식이다.
+
+- Hash Router
+  - `#/export/pdf`처럼 `#` 뒤 경로를 사용한다.
+  - 서버는 항상 `index.html` 하나만 열면 되고, 실제 화면 분기는 브라우저 안의 JS 라우터가 처리한다.
+  - 주소가 조금 덜 깔끔하지만, 정적 파일 환경이나 `file://` 환경에서 더 단순하고 안정적으로 동작한다.
+  - 즉 서버 도움 없이도 동작하기 쉬운 라우팅 방식이다.
+
+**왜 웹에서는 Browser Router가 자연스럽고, Electron에서는 Hash Router가 유리한가**
+
+- 웹 배포 환경
+  - Vercel 같은 정적 호스팅은 SPA fallback만 맞추면 `/projects`, `/export/pdf` 같은 경로를 Browser Router로 자연스럽게 운영할 수 있다.
+  - 사용자가 링크를 새 탭으로 열거나 새로고침해도 서버가 다시 `index.html`을 내려주면 된다.
+
+- Electron 배포 환경
+  - Electron은 결국 `file://.../index.html`을 여는 구조라서 서버가 없다.
+  - 이 상태에서 `/export/pdf` 같은 path 기반 route는 파일 시스템 경로처럼 해석되거나 별도 우회가 필요하다.
+  - 반면 `#/export/pdf`는 실제 파일 경로를 건드리지 않기 때문에 `index.html` 하나만 열어도 안정적으로 route를 표현할 수 있다.
+
+**이번 작업 기준으로 보면 차이가 더 분명하다**
+
+- Browser Router 기준 hidden window
+  - `file://.../index.html`을 연 다음
+  - 나중에 `replaceState("/export/pdf")`
+  - 그리고 `popstate` 이벤트를 수동으로 보내 route 이동을 유도해야 했다.
+  - 이 방식은 라우터 초기화 시점에 따라 이벤트가 유실될 수 있었다.
+
+- Hash Router 기준 hidden window
+  - 처음부터 `file://.../index.html#/export/pdf`로 연다.
+  - 라우터는 첫 렌더 시점에 현재 URL의 hash 값을 그대로 읽는다.
+  - 별도 history 조작이나 수동 이벤트가 필요 없다.
+  - 즉 "초기 route 이동"이 아니라 "올바른 route에서 시작"하는 구조가 된다.
+
+**정리**
+
+- Browser Router는 서버와 협력해서 깔끔한 path URL을 운영하는 방식이다.
+- Hash Router는 서버 도움 없이 현재 페이지 안에서 route를 관리하는 방식이다.
+- 이번 Electron PDF hidden window처럼 `file://` 기반, 서버 없음, 초기 진입 안정성이 중요한 경우에는 Hash Router가 더 잘 맞는다.
+- 그래서 웹은 `createBrowserRouter`, Electron은 `createHashRouter`로 분리하는 쪽이 이번 프로젝트 제약에 가장 자연스러웠다.
+
+#### Electron PDF 흐름 도식
+
+```text
+[Editor.tsx]
+사용자가 PDF 내보내기 클릭
+  ->
+buildExportDocument()로 공통 문서 모델 생성
+  ->
+Electron 환경이면 window.electron.savePdfDocument(filename, document)
+  ->
+[preload.ts]
+renderer 요청을 IPC로 메인 프로세스에 전달
+  ->
+[electron/main.ts]
+save-pdf-document 핸들러 실행
+  ->
+showSaveDialog()로 저장 경로 선택
+  ->
+hidden BrowserWindow 생성
+  ->
+pdfExportPayloads[webContents.id] = document 저장
+  ->
+hidden window가 /export/pdf route 로드
+  ->
+[ExportPdfPage.tsx]
+window.electron.getPdfExportPayload()로 자기 문서 payload 조회
+  ->
+documentModel state 세팅
+  ->
+본문 DOM 렌더 확인
+  ->
+fonts.ready + 2번의 requestAnimationFrame 대기
+  ->
+window.electron.notifyPdfExportReady()
+  ->
+[electron/main.ts]
+pdf-export-ready 신호 수신
+  ->
+hidden window.webContents.printToPDF(...)
+  ->
+PDF buffer 생성
+  ->
+fs.promises.writeFile(filePath, pdfBuffer)
+  ->
+payload 정리 + hidden window 닫기
+  ->
+renderer로 success 반환
+  ->
+[Editor.tsx]
+성공 토스트 표시
+```
+
+#### 확인한 코드 포인트
+
+- `electron/main.ts`
+  - hidden window 생성
+  - payload 보관
+  - export route 로드
+  - `printToPDF()` 호출
+- `electron/preload.ts`
+  - PDF 저장 요청 브리지
+  - payload 조회 브리지
+  - ready 알림 브리지
+- `frontend/src/pages/ExportPdfPage.tsx`
+  - payload 로드
+  - 렌더 완료 시점 보장
+- `frontend/src/features/export/components/ExportPdfDocument.tsx`
+  - 인쇄용 문서 HTML/CSS 렌더링
+  - 공백 및 라벨 페이지 브레이크 보정
+- `frontend/src/components/Editor.tsx`
+  - Electron PDF 저장 분기 연결
+
+#### 내일 할 일
+
+- [ ] `npm run electron:dev`에서 더 긴 문서 케이스를 수동 검증
+- [ ] 머리말, 꼬리말 스타일을 Chromium 제약 안에서 더 다듬을 수 있는지 확인
+- [ ] Electron 빌드 환경 `file://` route 전환이 실제 패키징에서도 안정적인지 점검
+- [ ] `_docs/export_guide.md` 상단 체크 상태와 최신 업데이트 섹션 간 중복 정리
+
+#### 회고/질문
+
+- Electron PDF는 웹 `jsPDF`처럼 좌표 기반으로 완전히 통제하는 대신, HTML/CSS를 얼마나 안정적으로 인쇄 상태로 만들 수 있나가 품질의 핵심이라는 점이 더 분명해졌다.
+- 지금 구조는 1차 구현으로 적절하지만, 나중에 페이지 번호 위치나 머리말, 꼬리말 디자인 자유도가 더 중요해지면 Chromium 템플릿 제약을 다시 검토할 필요가 있다.
+
+#### 진행률
+
+Week 9: 70%
+Total: 70%

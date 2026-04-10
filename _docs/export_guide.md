@@ -337,7 +337,7 @@ frontend/src/
 정렬은 항상 내보내기 직전에 다시 적용한다.
 
 ```ts
-[...paragraphs].sort((a, b) => a.orderIndex - b.orderIndex)
+[...paragraphs].sort((a, b) => a.orderIndex - b.orderIndex);
 ```
 
 진행 상태:
@@ -461,6 +461,7 @@ frontend/src/
 4. [x] 다이얼로그에서 포맷과 작성자 라벨 옵션을 선택
 5. [x] 웹은 `docx` 기반 Word 다운로드부터 구현
 6. [ ] PDF는 웹 1차 구현 후, 품질이 필요하면 Electron `printToPDF()`를 고도화
+
 ---
 
 ## 2026-04-07 Update
@@ -658,3 +659,445 @@ Electron PDF는 웹과 같은 `jsPDF`를 그대로 재사용할 수도 있지만
 3. Electron Word는 공통 문서 생성 함수 분리 후 파일 저장으로 연결한다.
 4. Electron PDF는 `printToPDF()` 중심으로 설계한다.
 5. 이후 플랫폼별 차이는 "출력 엔진"과 "저장 방식"에만 남기고, 데이터 모델과 옵션은 최대한 공통화한다.
+
+---
+
+## 2026-04-10 Update
+
+이 아래 내용은 Electron PDF 구현 방향을 실제 작업 단위까지 구체화한 최신 결정사항이다.
+
+### 이번 턴에서 확정한 정책
+
+- PDF 렌더링 방식:
+  - `hidden BrowserWindow + export 전용 route`
+- 시각 결과 기준:
+  - Electron PDF도 웹 PDF와 최대한 동일한 시각 결과를 목표로 한다.
+- 1차 범위 포함 항목:
+  - 페이지 번호
+  - 머리말
+  - 꼬리말
+
+즉, Electron PDF는 웹 `jsPDF` 코드를 그대로 재사용하지 않고, 웹 PDF와 같은 문서 구조와 시각 톤을 HTML/CSS로 재현한 뒤 Chromium `printToPDF()`로 출력한다.
+
+### 왜 `hidden window + route`로 가는가
+
+이 방식이 현재 요구사항과 가장 잘 맞는다.
+
+- `printToPDF()`는 현재 로드된 페이지를 인쇄하므로 export 전용 화면이 필요하다.
+- 메인 에디터 화면을 그대로 찍으면 편집 UI, 스크롤 상태, 앱 레이아웃 영향이 섞인다.
+- hidden window에 export 전용 route를 띄우면 PDF 전용 HTML/CSS를 안정적으로 제어할 수 있다.
+- 웹 PDF와 최대한 같은 시각 결과를 원할 때도, export 전용 route가 있어야 제목/부제/문단/라벨/여백/페이지 번호를 독립적으로 맞출 수 있다.
+
+### Electron PDF 1차 아키텍처
+
+권장 흐름은 아래와 같다.
+
+1. 렌더러(`Editor.tsx`)
+   - `buildExportDocument()`로 공통 `ExportDocumentModel` 생성
+   - Electron 환경이면 `window.electron.savePdfDocument()` 호출
+   - 인자로 `filename`, `documentModel`, `pdf options` 전달
+
+2. preload
+   - `savePdfDocument()` 브리지 API 노출
+   - 렌더러는 메인 프로세스 세부 구현을 모르고 이 API만 사용
+
+3. 메인 프로세스
+   - `ipcMain.handle("save-pdf-document", ...)` 추가
+   - `dialog.showSaveDialog()`로 저장 경로 선택
+   - hidden `BrowserWindow` 생성
+   - export 전용 route 로드
+   - export 데이터 주입
+   - 렌더 완료 신호 대기
+   - `webContents.printToPDF()` 호출
+   - `fs.promises.writeFile()`로 저장
+   - 성공/실패/취소 응답 반환
+
+4. export 전용 route
+   - PDF용 문서 레이아웃만 렌더링
+   - 제목, 날짜, 작성자 라벨, 문단 본문, 페이지 번호, 머리말, 꼬리말 표시
+   - `document.fonts.ready` 이후 렌더 완료 신호 전송
+
+### 권장 디렉터리 추가안
+
+```txt
+frontend/src/
+  features/export/
+    electron/
+      pdfPrintOptions.ts
+      pdfPrintLayout.ts
+    pages/
+      ExportPdfPage.tsx
+    components/
+      ExportPdfDocument.tsx
+```
+
+역할 예시:
+
+- `components/ExportPdfDocument.tsx`
+  - export 문서 본문 HTML 렌더링
+- `pages/ExportPdfPage.tsx`
+  - route 진입점
+  - preload를 통해 받은 export 데이터 로드
+  - 렌더 완료 신호 전송
+- `electron/pdfPrintOptions.ts`
+  - `printToPDF()` 옵션 상수 정리
+- `electron/pdfPrintLayout.ts`
+  - 머리말/꼬리말 텍스트 포맷, 페이지 번호 템플릿, 인쇄 메타데이터 정리
+
+현재 코드 구조를 크게 흔들고 싶지 않다면 `pages/` 대신 `features/export/electron/` 아래에 두어도 된다. 핵심은 "렌더링 컴포넌트"와 "route 엔트리"를 분리하는 것이다.
+
+### 라우팅 계획
+
+export 전용 route를 추가한다.
+
+- 예시 path: `/export/pdf`
+
+주의:
+
+- 일반 앱 레이아웃(`Layout`)을 그대로 감싸면 안 된다.
+- export route는 헤더/푸터/사이드바 없이 문서 본문만 렌더링해야 한다.
+
+현재 `App.tsx`는 모든 route를 `Layout`으로 감싸고 있으므로, 아래 둘 중 하나로 정리해야 한다.
+
+1. `routeList`에 `useLayout: false` 같은 메타를 추가하고 export route만 예외 처리
+2. export route를 `routeList` 바깥에서 별도로 선언
+
+권장:
+
+- 1차는 `routeList`에 `useLayout: false` 메타를 추가해 처리
+- 이유: 이후 print 전용 페이지가 늘어도 재사용 가능
+
+### 데이터 주입 방식
+
+PDF route에는 큰 JSON을 query string으로 싣지 않는다.
+
+권장 방식:
+
+- 메인 프로세스가 hidden window 생성
+- preload 브리지로 `window.electronPdf.getPayload()` 같은 API 제공
+- route 진입 시 브리지에서 `ExportDocumentModel`과 PDF 옵션을 읽음
+
+이유:
+
+- 문단 수가 많을수록 query string 기반 데이터 전달은 불안정하다.
+- 한글/개행/긴 문단을 포함한 JSON은 URL 인코딩 비용이 커진다.
+- hidden window는 Electron 전용 흐름이므로 preload 기반 전달이 더 자연스럽다.
+
+### preload 설계
+
+기존 `window.electron` 외에 PDF export 전용 최소 API를 추가한다.
+
+예시:
+
+```ts
+savePdfDocument(
+  filename: string,
+  document: ExportDocumentModel,
+): Promise<{
+  success: boolean;
+  path?: string;
+  error?: string;
+  canceled?: boolean;
+}>
+```
+
+hidden window 내부에서 사용할 API 예시:
+
+```ts
+window.electronPdf.getPayload(): Promise<{
+  document: ExportDocumentModel;
+  printOptions: ElectronPdfPrintOptions;
+}>
+
+window.electronPdf.notifyReady(): void
+```
+
+주의:
+
+- 메인 창과 hidden export 창이 같은 preload를 써도 되지만, 역할이 더 커지면 export 전용 preload 분리를 검토한다.
+- 1차 구현은 기존 preload 확장으로 시작해도 충분하다.
+
+### 메인 프로세스 작업 계획
+
+#### 1. 새 IPC 채널 추가
+
+- `save-pdf-document`
+
+입력:
+
+- `filename`
+- `ExportDocumentModel`
+
+출력:
+
+- `success`
+- `path`
+- `error`
+- `canceled`
+
+#### 2. 저장 다이얼로그
+
+- 기본 파일명: 공통 `buildExportFilename(documentModel, "pdf")`
+- 확장자 필터: `.pdf`
+
+#### 3. hidden `BrowserWindow` 생성
+
+권장 옵션:
+
+- `show: false`
+- `width`, `height`: A4 preview에 너무 작지 않은 크기
+- `backgroundColor: "#ffffff"`
+- `webPreferences.preload`: 기존 preload 또는 export 전용 preload
+- `contextIsolation: true`
+- `nodeIntegration: false`
+
+#### 4. route 로드
+
+개발 환경:
+
+- `${ELECTRON_START_URL}/export/pdf`
+
+빌드 환경:
+
+- `file://.../dist/index.html#/export/pdf` 또는 현재 라우터 전략에 맞는 정적 경로
+
+주의:
+
+- 현재 프로젝트는 `createBrowserRouter`를 쓰고 있다.
+- `file://` 환경에서 새 창 route 로딩까지 안정적으로 가져가려면 hash router 전환 여부를 검토해야 한다.
+- 1차 구현 전에 "Electron 빌드 환경에서 export route가 직접 열리는지"를 먼저 확인해야 한다.
+
+이 항목은 실제 구현 전 가장 먼저 검증할 리스크다.
+
+#### 5. 렌더 완료 대기
+
+메인 프로세스는 아래 순서를 기다려야 한다.
+
+1. route 로드 완료
+2. export payload 주입 완료
+3. `document.fonts.ready`
+4. 문서 렌더 완료 신호 수신
+
+준비가 끝나기 전에 `printToPDF()`를 호출하면 빈 페이지, 폰트 미적용, 레이아웃 흔들림이 생길 수 있다.
+
+#### 6. `printToPDF()` 호출
+
+1차 권장 옵션:
+
+- `printBackground: true`
+- `landscape: false`
+- `pageSize: "A4"`
+- `preferCSSPageSize: true`
+- `displayHeaderFooter: true`
+- `headerTemplate`
+- `footerTemplate`
+- `margins`
+
+머리말/꼬리말 예시:
+
+- header:
+  - 프로젝트 제목
+- footer:
+  - export 날짜
+  - 페이지 번호 (`pageNumber` / `totalPages`)
+
+주의:
+
+- Chromium header/footer 템플릿은 스타일 제약이 있다.
+- 웹 PDF와 완전히 동일한 모양이 어려우면, 1차에서는 "본문 시각 일치 우선 + 머리말/꼬리말은 인쇄 템플릿 규격 내 최적화"로 본다.
+
+### export 전용 페이지 설계
+
+이 페이지는 앱 화면이 아니라 인쇄용 문서다.
+
+구성 권장안:
+
+- 문서 컨테이너
+- 프로젝트 제목
+- export 날짜
+- paragraph list
+- 작성자 라벨
+- 문단 간 간격
+- 프린트 전용 CSS
+
+핵심 원칙:
+
+- 웹 `jsPDF`와 동일한 정보 구조를 쓴다.
+- 시각 결과를 맞추기 위해 제목/부제/본문/라벨 스타일 토큰을 공통 상수로 재사용한다.
+- 화면용 CSS와 인쇄용 CSS를 분리한다.
+
+권장 스타일 전략:
+
+- `@media print`에서 여백과 폰트 크기 조정
+- `@page`로 A4 및 기본 margin 정의
+- 문단 블록에 `break-inside: avoid` 적용 검토
+- 긴 문단은 자연스럽게 다음 페이지로 이어지게 두되, 문단 블록 전체 강제 이동은 최소화
+
+### 웹 PDF와 시각 결과를 맞추는 방법
+
+Electron PDF가 웹 PDF와 같은 데이터를 쓰는 것만으로는 부족하다. 아래를 함께 맞춰야 한다.
+
+- 제목 계층 구조
+- 부제(`Exported on YYYY-MM-DD`) 텍스트
+- 작성자 라벨 텍스트(`AI`, `USER`)
+- 문단 간격
+- 본문 줄간격
+- 폰트 톤
+- 색상 계열
+
+권장 방식:
+
+- `frontend/src/features/export/constants/pdf.ts`의 의미 단위를 재사용 가능한 토큰으로 유지
+- 웹 `jsPDF`와 Electron print route가 같은 spacing/font/color 상수를 참조하도록 정리
+
+즉, 출력 엔진은 다르지만 "레이아웃 토큰"은 최대한 공유한다.
+
+### 페이지 번호 / 머리말 / 꼬리말 1차 범위
+
+이번 턴에서 이 항목들은 1차 범위에 포함한다.
+
+#### 페이지 번호
+
+- 위치:
+  - footer 우측 권장
+- 형식:
+  - `Page X of Y`
+
+#### 머리말
+
+- 기본값:
+  - 프로젝트 제목
+- 정렬:
+  - 좌측 또는 중앙
+
+#### 꼬리말
+
+- 기본값:
+  - export 날짜 + 페이지 번호
+
+권장 우선순위:
+
+1. 페이지 번호 정상 출력
+2. 제목 머리말 표시
+3. export 날짜 꼬리말 표시
+4. 세부 스타일 조정
+
+### 실제 구현 순서
+
+#### 1단계. 타입과 IPC 계약 추가
+
+- [ ] `frontend/src/types/electron.d.ts`에 `savePdfDocument` 타입 추가
+- [ ] `electron/preload.ts`에 `savePdfDocument` 브리지 추가
+- [ ] 메인/hidden export window가 공통으로 쓸 payload 타입 정의
+
+#### 2단계. export route 기반 준비
+
+- [ ] `App.tsx` / 라우팅 구조에서 layout 없는 export route 지원
+- [ ] `/export/pdf` route 추가
+- [ ] `ExportPdfPage.tsx` 생성
+
+#### 3단계. 문서 렌더링 컴포넌트 작성
+
+- [ ] `ExportPdfDocument.tsx` 생성
+- [ ] 제목/부제/작성자 라벨/문단 HTML 렌더링
+- [ ] 웹 PDF와 맞는 스타일 토큰 반영
+- [ ] print CSS 추가
+
+#### 4단계. hidden window print 흐름 구현
+
+- [ ] `electron/main.ts`에 `save-pdf-document` 핸들러 추가
+- [ ] hidden `BrowserWindow` 생성 유틸 분리
+- [ ] route 로드 후 payload 주입
+- [ ] 렌더 완료 신호 대기
+- [ ] `printToPDF()` 호출
+- [ ] 파일 저장
+- [ ] 성공/실패/취소 응답 반환
+
+#### 5단계. Editor 연결
+
+- [ ] `Editor.tsx`에서 Electron + PDF 선택 시 `savePdfDocument()` 호출
+- [ ] 웹 환경에서는 기존 `exportPdfDocument()` 유지
+- [ ] 성공 토스트 문구를 Electron 저장 UX에 맞게 조정
+
+#### 6단계. 1차 검증
+
+- [ ] 짧은 문서
+- [ ] 긴 문서
+- [ ] 작성자 라벨 on/off
+- [ ] 한글 폰트
+- [ ] 페이지 번호
+- [ ] 머리말/꼬리말
+- [ ] 저장 취소
+- [ ] hidden window 정리
+
+### 가장 먼저 확인할 리스크
+
+현재 구조에서 가장 먼저 확인할 것은 아래 두 가지다.
+
+1. `createBrowserRouter` 기반 앱이 Electron 빌드 환경의 hidden window에서도 `/export/pdf`를 안정적으로 로드할 수 있는가
+2. Chromium `headerTemplate` / `footerTemplate`가 원하는 수준까지 시각 결과를 맞출 수 있는가
+
+이 둘은 구현 초반에 짧게 프로토타입 검증하는 것이 좋다.
+
+### 1차 완료 기준
+
+아래가 만족되면 Electron PDF 1차 구현 완료로 본다.
+
+- Electron에서 PDF 저장 다이얼로그가 뜬다.
+- hidden window가 export 전용 route를 렌더링한다.
+- 제목/날짜/문단/작성자 라벨이 웹 PDF와 유사한 시각 결과로 출력된다.
+- 페이지 번호가 정상 출력된다.
+- 머리말/꼬리말이 기본 정책대로 출력된다.
+- 저장 취소와 실패가 정상 처리된다.
+
+---
+
+```
+[Editor.tsx]
+사용자가 PDF 내보내기 클릭
+->
+buildExportDocument()로 공통 문서 모델 생성
+->
+Electron 환경이면 window.electron.savePdfDocument(filename, document)
+->
+[preload.ts]
+renderer 요청을 IPC로 메인 프로세스에 전달
+->
+[electron/main.ts]
+save-pdf-document 핸들러 실행
+->
+showSaveDialog()로 저장 경로 선택
+->
+hidden BrowserWindow 생성
+->
+pdfExportPayloads[webContents.id] = document 저장
+->
+hidden window가 /export/pdf route 로드
+->
+[ExportPdfPage.tsx]
+window.electron.getPdfExportPayload()로 자기 문서 payload 조회
+->
+documentModel state 세팅
+->
+fonts.ready + 2번의 requestAnimationFrame 대기
+->
+window.electron.notifyPdfExportReady()
+->
+[electron/main.ts]
+pdf-export-ready 신호 수신
+->
+hidden window.webContents.printToPDF(...)
+->
+PDF buffer 생성
+->
+fs.promises.writeFile(filePath, pdfBuffer)
+->
+payload 정리 + hidden window 닫기
+->
+renderer로 success 반환
+->
+[Editor.tsx]
+성공 토스트 표시
+```
+
+---
