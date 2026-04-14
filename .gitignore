@@ -5,6 +5,7 @@
 
 # Electron build output
 release/
+dist-electron/
 
 # Claude Code
 .claude/
