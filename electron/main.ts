@@ -16,7 +16,7 @@ let mainWindow: BrowserWindow | null = null;
 // 개발 중에는 Vite 서버를, 빌드 후에는 정적 index.html을 같은 진입점으로 다룹니다.
 const rendererEntryUrl =
   process.env.ELECTRON_START_URL ||
-  `file://${path.join(__dirname, "../dist/index.html")}`;
+  `file://${path.join(__dirname, "../frontend/dist/index.html")}`;
 
 interface ExportParagraphPayload {
   id: number;

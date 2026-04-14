@@ -40,7 +40,7 @@ const database_1 = require("./database");
 let mainWindow = null;
 // 개발 중에는 Vite 서버를, 빌드 후에는 정적 index.html을 같은 진입점으로 다룹니다.
 const rendererEntryUrl = process.env.ELECTRON_START_URL ||
-    `file://${path.join(__dirname, "../dist/index.html")}`;
+    `file://${path.join(__dirname, "../frontend/dist/index.html")}`;
 // hidden export window마다 자기 문서 payload를 찾아갈 수 있도록 webContents.id를 키로 보관합니다.
 const pdfExportPayloads = new Map();
 function createWindow() {

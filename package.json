@@ -1,10 +1,31 @@
 {
+  "name": "companion-writer",
+  "version": "0.1.0",
+  "description": "Desktop writing companion app.",
+  "author": "",
   "main": "dist-electron/main.js",
   "scripts": {
     "backend:dev": "npm run dev:server --prefix backend",
     "electron:dev": "concurrently \"npm run backend:dev\" \"npm run dev --prefix frontend\" \"wait-on http://localhost:5173 && tsc -p tsconfig.electron.json && cross-env ELECTRON_START_URL=http://localhost:5173 electron .\"",
-    "electron:build": "npm run build --prefix frontend && tsc -p tsconfig.electron.json && electron-builder",
+    "electron:build": "cross-env VITE_API_URL=https://writingai-dcb3.onrender.com/api npm run build --prefix frontend && tsc -p tsconfig.electron.json && electron-builder",
     "postinstall": "electron-rebuild -f -w better-sqlite3"
+  },
+  "build": {
+    "appId": "com.writingai.app",
+    "productName": "Companion Writer",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist-electron/**/*",
+      "frontend/dist/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "build/pencil_1.ico",
+      "signAndEditExecutable": false
+    }
   },
   "dependencies": {
     "better-sqlite3": "^12.8.0",

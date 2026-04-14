@@ -104,11 +104,7 @@
     "directories": {
       "output": "release"
     },
-    "files": [
-      "dist-electron/**/*",
-      "frontend/dist/**/*",
-      "package.json"
-    ],
+    "files": ["dist-electron/**/*", "frontend/dist/**/*", "package.json"],
     "win": {
       "target": "nsis",
       "icon": "build/icon.ico"
@@ -387,3 +383,505 @@ Word/PDF export는 일반 화면보다 정적 파일 의존성이 더 강하다.
 - [ ] 아이콘 파일 준비
 - [ ] `release` 출력 폴더 기준 첫 Windows 빌드 생성
 - [ ] 빌드된 설치 파일 수동 테스트
+
+---
+
+---
+
+## Electron Google Login Plan
+
+### Goal
+
+Electron 배포 앱에서는 기존 웹용 `@react-oauth/google` 팝업 로그인을 그대로 사용하지 않는다.
+
+Google OAuth는 Electron 내장 브라우저 창에서 차단될 수 있으므로, Electron 앱에서는 기본 브라우저를 열고 백엔드 session + polling 방식으로 로그인 결과를 받는다.
+
+```text
+Electron app
+-> Google login button
+-> backend creates temporary OAuth session
+-> Electron opens Google auth URL in the default browser
+-> Google redirects to backend callback with authorization code
+-> backend exchanges code for Google tokens
+-> Electron polls backend session status
+-> Electron receives app accessToken/user
+-> app login completed
+```
+
+1차 구현 방식:
+
+- 백엔드 session 생성
+- Electron 앱 polling
+- 기본 브라우저 `shell.openExternal`
+- deep link는 후속 작업으로 분리
+
+### Before Starting
+
+- [x] Electron build가 Render API를 바라보는지 확인
+  - [`package.json`](../package.json)
+  - `electron:build`에서 `VITE_API_URL=https://writingai-dcb3.onrender.com/api` 주입
+- [x] Google Cloud Console에 callback URI 등록
+  - `https://writingai-dcb3.onrender.com/api/auth/google/desktop/callback`
+- [x] Render 백엔드 환경변수 확인
+  - `GOOGLE_CLIENT_ID`
+  - `ACCESS_TOKEN_SECRET`
+  - `REFRESH_TOKEN_SECRET`
+  - `CORS_ORIGIN`
+
+### Step 1. Backend OAuth Session Store
+
+목표:
+
+- Electron Google 로그인 시도마다 임시 session을 만든다.
+- 1차 구현은 메모리 `Map`으로 시작한다.
+- 운영 안정화 단계에서는 Redis 또는 DB 저장으로 바꾼다.
+
+추가 파일:
+
+- [`backend/src/services/desktopOAuthSessions.ts`](../backend/src/services/desktopOAuthSessions.ts)
+
+구현할 것:
+
+- [ ] `createDesktopOAuthSession()`
+- [ ] `getDesktopOAuthSession(sessionId)`
+- [ ] `getDesktopOAuthSessionByState(state)`
+- [ ] `completeDesktopOAuthSession(state, result)`
+- [ ] `failDesktopOAuthSession(state, message)`
+- [ ] 5분 만료 처리
+
+데이터 형태:
+
+```ts
+type DesktopOAuthSession = {
+  sessionId: string;
+  state: string;
+  codeVerifier: string;
+  status: "pending" | "completed" | "failed" | "expired";
+  createdAt: number;
+  result?: DesktopOAuthResult;
+  message?: string;
+};
+```
+
+주의:
+
+- `sessionId`, `state`, `codeVerifier`는 `crypto.randomBytes()`로 생성한다.
+- `state`는 Google callback 검증용이다.
+- `sessionId`는 Electron polling용이다.
+
+### Step 2. Backend Desktop Google Controller
+
+목표:
+
+- Electron 앱 전용 Google OAuth endpoint를 기존 웹 Google 로그인과 분리한다.
+
+추가 파일 권장:
+
+- [`backend/src/controllers/desktopGoogleAuthController.ts`](../backend/src/controllers/desktopGoogleAuthController.ts)
+
+참고 파일:
+
+- [`backend/src/controllers/authController.ts`](../backend/src/controllers/authController.ts)
+
+추가할 endpoint 1:
+
+```http
+POST /api/auth/google/desktop/session
+```
+
+역할:
+
+- session 생성
+- Google OAuth URL 생성
+- `{ sessionId, authUrl }` 반환
+
+응답 예시:
+
+```json
+{
+  "sessionId": "random-session-id",
+  "authUrl": "https://accounts.google.com/o/oauth2/v2/auth?..."
+}
+```
+
+Google OAuth URL에 넣을 값:
+
+```text
+client_id=GOOGLE_CLIENT_ID
+redirect_uri=https://writingai-dcb3.onrender.com/api/auth/google/desktop/callback
+response_type=code
+scope=openid email profile
+state=...
+code_challenge=...
+code_challenge_method=S256
+prompt=select_account
+```
+
+추가할 endpoint 2:
+
+```http
+GET /api/auth/google/desktop/callback?code=...&state=...
+```
+
+역할:
+
+- `state`로 session 찾기
+- Google token endpoint에 `code` 교환
+- `id_token` 검증
+- 기존 Google 로그인 로직과 동일하게 사용자 조회/연동/신규 가입 처리
+- session 상태를 `completed` 또는 `failed`로 변경
+- 브라우저에는 완료 안내 HTML 반환
+
+브라우저 응답 예시:
+
+```html
+<h1>로그인이 완료되었습니다.</h1>
+<p>Companion Writer 앱으로 돌아가세요.</p>
+```
+
+추가할 endpoint 3:
+
+```http
+GET /api/auth/google/desktop/session/:sessionId
+```
+
+역할:
+
+- Electron 앱 polling용 상태 반환
+
+pending 응답:
+
+```json
+{
+  "status": "pending"
+}
+```
+
+completed 응답:
+
+```json
+{
+  "status": "completed",
+  "accessToken": "...",
+  "user": {
+    "username": "...",
+    "email": "..."
+  }
+}
+```
+
+신규 사용자 응답:
+
+```json
+{
+  "status": "completed",
+  "isNewUser": true,
+  "signupToken": "...",
+  "profile": {
+    "email": "...",
+    "name": "..."
+  }
+}
+```
+
+failed 응답:
+
+```json
+{
+  "status": "failed",
+  "message": "Google 로그인에 실패했습니다."
+}
+```
+
+### Step 3. Backend Routes
+
+목표:
+
+- 새 desktop Google auth endpoint를 `/api/auth` 아래에 연결한다.
+
+수정 파일:
+
+- [`backend/src/routes/authRoutes.ts`](../backend/src/routes/authRoutes.ts)
+
+추가할 route:
+
+```ts
+authRouter.post("/google/desktop/session", createDesktopGoogleSession);
+authRouter.get("/google/desktop/callback", handleDesktopGoogleCallback);
+authRouter.get(
+  "/google/desktop/session/:sessionId",
+  getDesktopGoogleSessionStatus,
+);
+```
+
+확인:
+
+- [ ] Render 배포 후 `POST /api/auth/google/desktop/session` 호출 성공
+- [ ] 응답에 `authUrl` 포함
+- [ ] 브라우저에서 `authUrl` 접속 시 Google 로그인 화면 표시
+- [ ] Google 로그인 후 callback endpoint 호출
+
+### Step 4. Electron External Browser API
+
+목표:
+
+- Electron 앱이 Google OAuth URL을 기본 브라우저로 열 수 있게 한다.
+- `BrowserWindow` 내부 팝업을 사용하지 않는다.
+
+수정 파일:
+
+- [`electron/main.ts`](../electron/main.ts)
+- [`electron/preload.ts`](../electron/preload.ts)
+- [`frontend/src/types/electron.d.ts`](../frontend/src/types/electron.d.ts)
+
+`electron/main.ts`:
+
+- [ ] `shell` import 추가
+- [ ] IPC handler 추가
+
+```ts
+ipcMain.handle("open-external-url", async (_event, url: string) => {
+  await shell.openExternal(url);
+});
+```
+
+`electron/preload.ts`:
+
+```ts
+openExternalUrl: (url: string) =>
+  ipcRenderer.invoke("open-external-url", url),
+```
+
+`frontend/src/types/electron.d.ts`:
+
+```ts
+openExternalUrl: (url: string) => Promise<void>;
+```
+
+확인:
+
+- [ ] Electron 앱에서 `window.electron.openExternalUrl(url)` 호출 가능
+- [ ] 기본 브라우저가 열린다
+
+### Step 5. Frontend API
+
+목표:
+
+- Electron Google 로그인 session 생성과 polling API를 프론트에서 호출한다.
+
+수정 파일:
+
+- [`frontend/src/api/auth.api.ts`](../frontend/src/api/auth.api.ts)
+
+추가할 함수:
+
+```ts
+export const createDesktopGoogleSession = async () => {
+  const response = await apiClient.post("/auth/google/desktop/session");
+  return response.data;
+};
+
+export const getDesktopGoogleSessionStatus = async (sessionId: string) => {
+  const response = await apiClient.get(
+    `/auth/google/desktop/session/${sessionId}`,
+  );
+  return response.data;
+};
+```
+
+확인:
+
+- [ ] Electron build에서 `apiClient`가 Render API를 바라봄
+- [ ] `createDesktopGoogleSession()` 응답에 `sessionId`, `authUrl` 포함
+
+### Step 6. Frontend Electron Google Login Hook
+
+목표:
+
+- Electron 앱에서 Google 로그인 버튼 클릭 시 session 생성, 브라우저 열기, polling, 로그인 완료 처리를 수행한다.
+
+수정 파일:
+
+- [`frontend/src/hooks/useAuth.ts`](../frontend/src/hooks/useAuth.ts)
+- 또는 [`frontend/src/hooks/useAuthMutations.ts`](../frontend/src/hooks/useAuthMutations.ts)
+- 로그인 상태 저장 참고: [`frontend/src/store/authStore.ts`](../frontend/src/store/authStore.ts)
+
+구현 흐름:
+
+```text
+1. createDesktopGoogleSession()
+2. window.electron.openExternalUrl(authUrl)
+3. 2초마다 getDesktopGoogleSessionStatus(sessionId)
+4. status === "completed"면 storeLogin()
+5. 신규 사용자면 /extra-info로 이동
+6. failed/expired/timeout이면 에러 표시
+```
+
+권장 polling 설정:
+
+- interval: 2초
+- timeout: 5분
+- 완료/실패 시 polling 중단
+
+주의:
+
+- polling timer는 component unmount 시 정리한다.
+- accessToken은 기존 이메일 로그인과 동일하게 `storeLogin()`에 저장한다.
+- refresh token 저장은 1차 구현 범위에서 제외한다.
+
+### Step 7. Login UI Branching
+
+목표:
+
+- 웹에서는 기존 `@react-oauth/google` 유지
+- Electron에서는 새 desktop OAuth 버튼 사용
+
+수정 파일:
+
+- [`frontend/src/pages/auth/Login.tsx`](../frontend/src/pages/auth/Login.tsx)
+
+분기 기준:
+
+```ts
+const isElectron = Boolean(window.electron);
+```
+
+렌더링 방향:
+
+```tsx
+{
+  isElectron ? (
+    <Button type="button" onClick={handleElectronGoogleLogin}>
+      Google 계정으로 로그인
+    </Button>
+  ) : (
+    <GoogleLogin
+      onSuccess={handleGoogleSuccess}
+      onError={handleGoogleError}
+      text="continue_with"
+      size="large"
+      theme="outline"
+    />
+  );
+}
+```
+
+확인:
+
+- [ ] 웹/Vercel에서는 기존 Google 버튼 표시
+- [ ] Electron 앱에서는 기존 Google 팝업 버튼 미표시
+- [ ] Electron 앱에서는 새 버튼 클릭 시 기본 브라우저 열림
+
+### Step 8. Render Deploy And Google Console
+
+목표:
+
+- 백엔드 callback endpoint가 실제 Render 환경에서 동작하게 한다.
+
+Google Cloud Console:
+
+- [ ] OAuth client redirect URI 추가
+
+```text
+https://writingai-dcb3.onrender.com/api/auth/google/desktop/callback
+```
+
+Render:
+
+- [ ] 백엔드 최신 코드 배포
+- [ ] `GOOGLE_CLIENT_ID`가 Google Cloud Console client id와 일치
+- [ ] `NODE_ENV=production`
+- [ ] DB 연결 정상
+
+### Step 9. Electron Rebuild
+
+목표:
+
+- 새 프론트/Electron 코드가 설치 파일에 포함되게 한다.
+
+확인 파일:
+
+- [`package.json`](../package.json)
+- [`frontend/vite.config.ts`](../frontend/vite.config.ts)
+- [`electron/main.ts`](../electron/main.ts)
+- [`electron/preload.ts`](../electron/preload.ts)
+
+빌드:
+
+```powershell
+cmd /c npm run electron:build
+```
+
+결과물:
+
+```text
+release/Companion Writer Setup 0.1.0.exe
+```
+
+설치 후 이전 앱이 남아 있으면 제거 후 재설치한다.
+
+### Step 10. Manual Verification
+
+Electron 앱:
+
+- [ ] 이메일 로그인 정상
+- [ ] Electron Google 로그인 버튼 표시
+- [ ] 버튼 클릭 시 기본 브라우저 열림
+- [ ] Google 계정 선택 가능
+- [ ] Google 로그인 후 브라우저에 완료 안내 표시
+- [ ] Electron 앱에서 polling 완료
+- [ ] 앱 로그인 상태로 이동
+- [ ] 신규 Google 사용자면 추가 정보 입력 페이지로 이동
+- [ ] 기존 Google 사용자면 홈으로 이동
+
+백엔드:
+
+- [ ] `/auth/google/desktop/session` 성공
+- [ ] `/auth/google/desktop/callback` 성공
+- [ ] `/auth/google/desktop/session/:sessionId`가 `completed` 반환
+- [ ] 실패 시 `failed` 또는 `expired` 반환
+
+로그 확인:
+
+- Electron DevTools Network
+- Render backend logs
+- Google Cloud Console OAuth 설정
+
+### Follow-Up Work
+
+1차 구현에서는 accessToken 기반 로그인 완료까지만 목표로 한다.
+
+후속 검토:
+
+- [ ] Electron용 refresh token 저장 전략
+- [ ] Windows Credential Manager 또는 OS secure storage 사용
+- [ ] session 저장소를 메모리 `Map`에서 Redis/DB로 변경
+- [ ] deep link 방식 검토
+- [ ] Google 로그인 완료 후 앱 자동 focus
+- [ ] desktop OAuth 실패 메시지 UX 개선
+
+### Debug Guide
+
+Google 브라우저 화면에서 `redirect_uri_mismatch`:
+
+- Google Cloud Console redirect URI가 Render callback URL과 정확히 일치하지 않음
+
+Electron에서 polling이 계속 `pending`:
+
+- callback endpoint가 호출되지 않았거나 `state` 검증 실패
+- Render logs 확인
+
+Electron에서 `completed`를 받았는데 로그인 상태가 안 바뀜:
+
+- `storeLogin()` 호출 인자 확인
+- 기존 이메일 로그인 성공 처리와 동일한 구조인지 확인
+
+Google 로그인은 됐는데 앱 재실행 후 로그아웃됨:
+
+- refresh token을 Electron 앱에 저장하지 않았기 때문
+- 1차 범위에서는 정상적인 제한으로 보고 후속 작업에서 처리
+
+브라우저에서 Google OAuth가 또 차단됨:
+
+- `shell.openExternal()`이 아니라 Electron 내부 팝업이 열리고 있는지 확인
+- Electron에서는 반드시 기본 브라우저를 열어야 함
