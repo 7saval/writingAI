@@ -3,6 +3,9 @@
 
 .antigravityrules
 
+# Electron build output
+release/
+
 # Claude Code
 .claude/
 CLAUDE.md
