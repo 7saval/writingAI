@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   checkEmail,
@@ -192,6 +193,22 @@ export const useSocialSignupMutation = () => {
  */
 export const useDesktopGoogleLogin = () => {
   const { storeLogin } = useAuthStore();
+  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+      }
+    };
+  }, []);
+
+  const clearPoll = () => {
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+  };
 
   return useMutation({
     mutationFn: async (): Promise<
@@ -209,23 +226,25 @@ export const useDesktopGoogleLogin = () => {
 
       // 3. 폴링 시작
       return new Promise((resolve, reject) => {
-        const pollInterval = setInterval(async () => {
+        clearPoll();
+
+        pollIntervalRef.current = setInterval(async () => {
           try {
             const statusData = await getDesktopGoogleSessionStatus(sessionId);
 
             if (statusData.status === "completed") {
-              clearInterval(pollInterval);
+              clearPoll();
               resolve(statusData);
             } else if (statusData.status === "failed") {
-              clearInterval(pollInterval);
+              clearPoll();
               reject(new Error(statusData.message || "Google login failed"));
             } else if (statusData.status === "expired") {
-              clearInterval(pollInterval);
+              clearPoll();
               reject(new Error("Login session expired. Please try again."));
             }
             // "pending"인 경우 계속 폴링
           } catch (error) {
-            clearInterval(pollInterval);
+            clearPoll();
             reject(error);
           }
         }, 2000);
@@ -233,8 +252,10 @@ export const useDesktopGoogleLogin = () => {
         // 5분 후 타임아웃
         setTimeout(
           () => {
-            clearInterval(pollInterval);
-            reject(new Error("Login timed out. Please try again."));
+            if (pollIntervalRef.current) {
+              clearPoll();
+              reject(new Error("Login timed out. Please try again."));
+            }
           },
           5 * 60 * 1000,
         );
@@ -242,8 +263,11 @@ export const useDesktopGoogleLogin = () => {
     },
     onSuccess: (data: LoginResponse) => {
       if (data.user && data.accessToken) {
-        storeLogin(data.user.username, data.accessToken);
+        storeLogin(data.user.username, data.accessToken, data.refreshToken);
       }
+    },
+    onSettled: () => {
+      clearPoll();
     },
   });
 };

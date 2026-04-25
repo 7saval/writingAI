@@ -13,9 +13,13 @@ const client = new OAuth2Client(
 );
 
 // Desktop용 Google 로그인 리디렉션 URI (Google Console에 등록된 것과 일치해야 함)
-const DESKTOP_REDIRECT_URI =
-  process.env.GOOGLE_DESKTOP_REDIRECT_URI ||
-  "https://writingai-dcb3.onrender.com/api/auth/google/desktop/callback";
+const DESKTOP_REDIRECT_URI = process.env.GOOGLE_DESKTOP_REDIRECT_URI;
+
+if (!DESKTOP_REDIRECT_URI) {
+  console.warn(
+    "Warning: GOOGLE_DESKTOP_REDIRECT_URI is not defined in environment variables.",
+  );
+}
 
 /**
  * 1. Electron 로그인 세션 생성 및 인증 URL 반환
@@ -189,6 +193,7 @@ export async function handleDesktopGoogleCallback(
     // Desktop 폴링 세션 완료 업데이트
     desktopOAuthSessions.completeDesktopOAuthSession(state as string, {
       accessToken,
+      refreshToken,
       user: {
         username: user.username,
         email: user.email,

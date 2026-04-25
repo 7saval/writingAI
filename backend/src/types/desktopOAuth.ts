@@ -4,10 +4,11 @@ export type DesktopOAuthUser = {
 };
 
 export type DesktopOAuthResult = {
-  accessToken?: string;
-  user?: DesktopOAuthUser;
   isNewUser?: boolean;
   signupToken?: string;
+  accessToken?: string;
+  refreshToken?: string;
+  user?: DesktopOAuthUser;
   profile?: {
     email: string;
     name: string;

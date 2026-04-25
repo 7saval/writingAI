@@ -18,6 +18,7 @@ export const checkEmail = async (email: Pick<SignupProps, 'email'>) => {
 export interface LoginResponse {
     authenticated?: boolean;
     accessToken?: string;
+    refreshToken?: string;
     isNewUser?: boolean;
     signupToken?: string;
     profile?: {
