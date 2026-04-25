@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useLoginMutation, useGoogleLoginMutation } from "@/hooks/useAuth";
+import { useLoginMutation, useGoogleLoginMutation, useDesktopGoogleLogin } from "@/hooks/useAuth";
 import { useForm } from "react-hook-form";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useToast } from "@/hooks/useToast";
@@ -134,6 +134,36 @@ const Login = () => {
     });
   };
 
+  // 데스크톱 전용 구글 로그인
+  const desktopGoogleLoginMutation = useDesktopGoogleLogin();
+  const isElectron = Boolean(window.electron);
+
+  const handleDesktopGoogleLogin = async () => {
+    try {
+      const res = await desktopGoogleLoginMutation.mutateAsync();
+
+      if (res.isNewUser) {
+        navigate("/extra-info", {
+          state: {
+            signupToken: res.signupToken,
+            profile: res.profile,
+          },
+        });
+      } else {
+        navigate("/");
+        toast({
+          description: "Google 계정으로 로그인되었습니다.",
+        });
+      }
+    } catch (error: any) {
+      console.error(error);
+      setError("root", {
+        type: "manual",
+        message: error.message || "Google 로그인에 실패했습니다.",
+      });
+    }
+  };
+
   return (
     <div className="flex min-h-full w-full items-center justify-center p-6">
       <div className="w-full max-w-sm">
@@ -235,13 +265,27 @@ const Login = () => {
                   </div>
 
                   <div className="flex justify-center">
-                    <GoogleLogin
-                      onSuccess={handleGoogleSuccess}
-                      onError={handleGoogleError}
-                      text="continue_with"
-                      size="large"
-                      theme="outline"
-                    />
+                    {isElectron ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full"
+                        onClick={handleDesktopGoogleLogin}
+                        disabled={desktopGoogleLoginMutation.isPending}
+                      >
+                        {desktopGoogleLoginMutation.isPending
+                          ? "로그인 진행 중..."
+                          : "Google 계정으로 로그인"}
+                      </Button>
+                    ) : (
+                      <GoogleLogin
+                        onSuccess={handleGoogleSuccess}
+                        onError={handleGoogleError}
+                        text="continue_with"
+                        size="large"
+                        theme="outline"
+                      />
+                    )}
                   </div>
                 </div>
                 <div className="mt-4 text-center text-sm">

@@ -4,7 +4,8 @@ interface StoreState {
     isLoggedIn: boolean;
     username: string | null;
     accessToken: string | null;
-    storeLogin: (username: string, accessToken: string) => void;
+    refreshToken: string | null;
+    storeLogin: (username: string, accessToken: string, refreshToken?: string) => void;
     storeLogout: () => void;
     setAccessToken: (token: string) => void;
 }
@@ -14,11 +15,12 @@ export const useAuthStore = create<StoreState>((set) => ({
     isLoggedIn: false,
     username: null,
     accessToken: null,
-    storeLogin: (username: string, accessToken: string) => {
-        set(() => ({ isLoggedIn: true, username, accessToken }));
+    refreshToken: null,
+    storeLogin: (username: string, accessToken: string, refreshToken?: string) => {
+        set(() => ({ isLoggedIn: true, username, accessToken, refreshToken: refreshToken || null }));
     },
     storeLogout: () => {
-        set(() => ({ isLoggedIn: false, username: null, accessToken: null }));
+        set(() => ({ isLoggedIn: false, username: null, accessToken: null, refreshToken: null }));
     },
     setAccessToken: (accessToken: string) => {
         set(() => ({ accessToken }));

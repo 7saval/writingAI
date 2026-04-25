@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   checkEmail,
@@ -9,6 +10,9 @@ import {
   socialSignup,
   verifyUser,
   refresh,
+  createDesktopGoogleSession,
+  getDesktopGoogleSessionStatus,
+  type LoginResponse,
 } from "@/api/auth.api";
 import type { LoginProps } from "@/pages/auth/Login";
 import type { SignupProps } from "@/pages/auth/Signup";
@@ -126,7 +130,7 @@ export const useEmailCheckMutation = () => {
  */
 export const useForgotPasswordMutation = () => {
   return useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: Pick<LoginProps, "email">) => {
       const response = await forgotPassword(data);
       return response;
     },
@@ -138,7 +142,7 @@ export const useForgotPasswordMutation = () => {
  */
 export const useResetPasswordMutation = () => {
   return useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: Parameters<typeof resetPassword>[0]) => {
       const response = await resetPassword(data);
       return response;
     },
@@ -176,10 +180,94 @@ export const useSocialSignupMutation = () => {
       const response = await socialSignup(data);
       return response;
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data: LoginResponse) => {
       if (data.user && data.accessToken) {
         storeLogin(data.user.username, data.accessToken);
       }
+    },
+  });
+};
+
+/**
+ * 데스크톱용 구글 로그인 훅
+ */
+export const useDesktopGoogleLogin = () => {
+  const { storeLogin } = useAuthStore();
+  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+      }
+    };
+  }, []);
+
+  const clearPoll = () => {
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+  };
+
+  return useMutation({
+    mutationFn: async (): Promise<
+      LoginResponse & { status: string; message?: string }
+    > => {
+      // 1. 세션 생성
+      const { sessionId, authUrl } = await createDesktopGoogleSession();
+
+      // 2. 기본 브라우저에서 인증 URL 열기
+      if (window.electron) {
+        await window.electron.openExternalUrl(authUrl);
+      } else {
+        throw new Error("Electron environment not found");
+      }
+
+      // 3. 폴링 시작
+      return new Promise((resolve, reject) => {
+        clearPoll();
+
+        pollIntervalRef.current = setInterval(async () => {
+          try {
+            const statusData = await getDesktopGoogleSessionStatus(sessionId);
+
+            if (statusData.status === "completed") {
+              clearPoll();
+              resolve(statusData);
+            } else if (statusData.status === "failed") {
+              clearPoll();
+              reject(new Error(statusData.message || "Google login failed"));
+            } else if (statusData.status === "expired") {
+              clearPoll();
+              reject(new Error("Login session expired. Please try again."));
+            }
+            // "pending"인 경우 계속 폴링
+          } catch (error) {
+            clearPoll();
+            reject(error);
+          }
+        }, 2000);
+
+        // 5분 후 타임아웃
+        setTimeout(
+          () => {
+            if (pollIntervalRef.current) {
+              clearPoll();
+              reject(new Error("Login timed out. Please try again."));
+            }
+          },
+          5 * 60 * 1000,
+        );
+      });
+    },
+    onSuccess: (data: LoginResponse) => {
+      if (data.user && data.accessToken) {
+        storeLogin(data.user.username, data.accessToken, data.refreshToken);
+      }
+    },
+    onSettled: () => {
+      clearPoll();
     },
   });
 };

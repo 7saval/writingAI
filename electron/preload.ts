@@ -28,4 +28,5 @@ contextBridge.exposeInMainWorld("electron", {
       ipcRenderer.removeListener("shortcut-pressed", handler);
     };
   },
+  openExternalUrl: (url: string) => ipcRenderer.invoke("open-external-url", url),
 });

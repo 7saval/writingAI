@@ -37,6 +37,7 @@ export interface ElectronAPI {
   saveToDb: (docId: string, content: string) => Promise<{ success: boolean }>;
   showNotification: (title: string, body: string) => void;
   onShortcutPressed: (callback: (action: string) => void) => () => void;
+  openExternalUrl: (url: string) => Promise<void>;
 }
 
 declare global {
