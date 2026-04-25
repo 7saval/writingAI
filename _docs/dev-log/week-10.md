@@ -170,17 +170,17 @@ release/win-unpacked/
 
 #### 📌 내일 할 일
 
-- [ ] Electron용 Google 로그인 backend controller 구현
+- [x] Electron용 Google 로그인 backend controller 구현
   - `backend/src/controllers/desktopGoogleAuthController.ts`
   - `POST /api/auth/google/desktop/session`
   - `GET /api/auth/google/desktop/callback`
   - `GET /api/auth/google/desktop/session/:sessionId`
-- [ ] `backend/src/routes/authRoutes.ts`에 desktop Google auth route 연결
-- [ ] Google authorization code를 token endpoint에 교환하는 로직 구현
-- [ ] Google Cloud Console redirect URI와 백엔드 `redirect_uri` 일치 여부 재확인
-- [ ] Electron main/preload에 `openExternalUrl` IPC 추가
-- [ ] 프론트 로그인 화면에서 웹 Google 로그인과 Electron Google 로그인 분기
-- [ ] Electron 앱에서 polling으로 Google 로그인 완료 처리
+- [x] `backend/src/routes/authRoutes.ts`에 desktop Google auth route 연결
+- [x] Google authorization code를 token endpoint에 교환하는 로직 구현
+- [x] Google Cloud Console redirect URI와 백엔드 `redirect_uri` 일치 여부 재확인
+- [x] Electron main/preload에 `openExternalUrl` IPC 추가
+- [x] 프론트 로그인 화면에서 웹 Google 로그인과 Electron Google 로그인 분기
+- [x] Electron 앱에서 polling으로 Google 로그인 완료 처리
 
 - [ ] 1차 빌드/배포 후 남은 구현 사항 정리 및 진행
   - [ ] 설치 앱 수동 검증 체크리스트 수행
@@ -220,8 +220,8 @@ release/win-unpacked/
 
 - Electron Google 로그인에서 refresh token을 1차 구현에 포함할지, accessToken 기반 로그인 완료까지만 볼지 결정 필요
 - backend session store를 현재는 메모리 `Map`으로 설계했는데, Render 재시작/멀티 인스턴스까지 고려하면 Redis 또는 DB 저장으로 확장 필요
-- `signAndEditExecutable: false`는 1차 빌드를 위한 우회이므로, 공개 배포 전 코드 서명과 아이콘 규격을 다시 정리해야 함
-- Google OAuth 신규 사용자 흐름에서 `extra-info` 페이지로 이동할 때 기존 웹 플로우와 동일하게 처리되는지 검증 필요
+- `signAndEditExecutable: false`는 1차 빌드를 위한 우회이므로, 공개 배포 전 코드 서명과 아이콘 규격을 다시 정리해야 함 ✅
+- Google OAuth 신규 사용자 흐름에서 `extra-info` 페이지로 이동할 때 기존 웹 플로우와 동일하게 처리되는지 검증 필요 ✅
 
 #### 📊 진행률
 
