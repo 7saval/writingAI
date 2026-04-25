@@ -496,7 +496,7 @@ export async function completeSocialSignup(
 // 토큰 갱신
 export async function refresh(req: Request, res: Response, next: NextFunction) {
   try {
-    const refreshToken = req.cookies.refreshToken;
+    const refreshToken = req.cookies.refreshToken || req.body.refreshToken;
 
     if (!refreshToken) {
       return res.status(StatusCodes.OK).json({

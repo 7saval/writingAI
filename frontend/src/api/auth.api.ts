@@ -2,6 +2,8 @@ import { apiClient } from "@/api/client";
 import type { LoginProps } from "@/pages/auth/Login";
 import type { SignupProps } from "@/pages/auth/Signup";
 
+import { useAuthStore } from "@/store/authStore";
+
 // 회원가입
 export const signup = async (data: SignupProps) => {
     const response = await apiClient.post(`/auth/signup`, data);
@@ -33,7 +35,8 @@ export interface LoginResponse {
 
 // 토큰 갱신
 export const refresh = async () => {
-    const response = await apiClient.post<{ accessToken: string }>(`/auth/refresh`);
+    const refreshToken = useAuthStore.getState().refreshToken;
+    const response = await apiClient.post<{ accessToken: string }>(`/auth/refresh`, { refreshToken });
     return response.data;
 }
 
