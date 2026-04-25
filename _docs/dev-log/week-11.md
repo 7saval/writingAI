@@ -19,6 +19,8 @@
   - 데스크톱 로그인 결과에 `refreshToken` 추가 전달 및 저장
   - `useDesktopGoogleLogin` 훅에 `useRef`/`useEffect` 클린업 로직 추가 (메모리 누수 방지)
   - 백엔드 리디렉션 URI 하드코딩 제거
+- ✅ **전체 빌드 후 아이콘 및 패키징 최종 확인**
+  - `signAndEditExecutable` 설정 수정 및 `BrowserWindow` 아이콘 경로 명시를 통해 배포 아이콘 이슈 해결
 
 #### 💡 배운 것
 
@@ -98,11 +100,60 @@ const refreshToken = useAuthStore.getState().refreshToken;
 const response = await apiClient.post("/auth/refresh", { refreshToken });
 ```
 
+**5. 데스크톱 앱 설치 후 아이콘이 기본 Electron 아이콘으로 표시되는 문제**
+
+- **문제**: 설치 파일(`.exe`)의 아이콘은 변경되었으나, 실제 설치된 앱 실행 파일 및 작업표시줄 아이콘이 기본 Electron 아이콘으로 유지됨.
+- **원인**:
+  1. `package.json`의 `signAndEditExecutable: false` 설정으로 인해 빌드 시 실행 파일의 리소스(아이콘) 수정 단계가 생략됨.
+  2. `main.ts`의 `BrowserWindow` 생성 시 `icon` 속성이 누락되어 런타임 아이콘이 기본값으로 설정됨.
+  3. `pencil_1.ico`와 같은 임의의 파일명이 `electron-builder`에서 간헐적으로 인식되지 않는 문제 발생.
+- **해결**:
+  - **설정 수정**: `package.json`에서 `"signAndEditExecutable": false` 줄을 삭제하여 리소스 수정을 허용함.
+  - **코드 보완**: `main.ts`의 `BrowserWindow` 옵션에 `icon: path.join(__dirname, "../build/icon.ico")`를 명시적으로 추가.
+  - **파일명 표준화**: 아이콘 파일명을 `icon.ico`로 변경하여 호환성을 높임.
+  - **권한 처리**: 빌드 시 심볼릭 링크 생성 에러 발생 시 터미널을 **관리자 권한**으로 실행하거나 **윈도우 개발자 모드**를 활성화하여 해결.
+
 #### 📌 내일 할 일
 
 - [ ] 데스크톱 로그인 세션 만료 시간 최적화 테스트
 - [ ] 로그아웃 시 백엔드 세션 정리 로직 보완
-- [ ] 전체 빌드 후 아이콘 및 패키징 최종 확인
+- [ ] 1차 빌드/배포 후 남은 구현 사항 정리 및 진행
+  - [ ] 설치 앱 수동 검증 체크리스트 수행
+    - 앱 실행
+    - 이메일 로그인
+    - 프로젝트 목록 조회
+    - 프로젝트 진입
+    - 문단 작성/저장
+    - 앱 종료 후 재실행 시 데이터 유지 확인
+    - Word export
+    - PDF export
+  - [x] 배포용 앱 아이콘 재준비
+    - 256x256 이상 포함된 `.ico` 파일 생성
+    - `package.json`의 `win.icon` 설정 복구
+  - [ ] `signAndEditExecutable: false` 우회 설정 재검토
+    - 1차 내부 테스트에서는 유지 가능
+    - 공개 배포 전 코드 서명/실행 파일 메타데이터 편집 방식 다시 확인
+  - [ ] Electron 앱 데이터 위치와 DB 확인 방법 문서화
+    - `app.getPath("userData")`
+    - `writingApp.db`
+    - Windows `%APPDATA%/Companion Writer`
+  - [ ] 배포 환경 로그 확인 방법 정리
+    - Electron DevTools
+    - Render backend logs
+    - 설치 앱 실행 로그
+  - [ ] 배포 산출물 공유 방식 결정
+    - GitHub Releases
+    - Notion/Drive 임시 공유
+    - 내부 테스트용 설치 파일 전달 방식
+  - [ ] 장기 후속 작업 분리
+    - 자동 업데이트
+    - Windows 코드 서명
+    - macOS 빌드
+    - CI/CD 기반 자동 빌드
+
+#### 🚨 이슈/질문
+
+- backend session store를 현재는 메모리 `Map`으로 설계했는데, Render 재시작/멀티 인스턴스까지 고려하면 Redis 또는 DB 저장으로 확장 필요
 
 #### 📊 진행률
 
