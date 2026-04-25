@@ -6,6 +6,7 @@ import {
   ipcMain,
   Notification,
   WebContents,
+  shell,
 } from "electron";
 import * as fs from "fs";
 import * as path from "path";
@@ -343,4 +344,8 @@ ipcMain.handle("save-doc", (_event, docId, content) => {
     console.error("Failed to save document to database:", error);
     return { success: false };
   }
+});
+
+ipcMain.handle("open-external-url", async (_event, url: string) => {
+  await shell.openExternal(url);
 });

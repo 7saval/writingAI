@@ -87,3 +87,15 @@ export const socialSignup = async (data: { signupToken: string; nickname: string
     const response = await apiClient.post<LoginResponse>(`/auth/social-signup`, data);
     return response.data;
 }
+
+// 데스크톱 구글 로그인 세션 생성
+export const createDesktopGoogleSession = async () => {
+    const response = await apiClient.post<{ sessionId: string; authUrl: string }>(`/auth/google/desktop/session`);
+    return response.data;
+}
+
+// 데스크톱 구글 로그인 세션 상태 확인 (폴링용)
+export const getDesktopGoogleSessionStatus = async (sessionId: string) => {
+    const response = await apiClient.get<LoginResponse & { status: string; message?: string }>(`/auth/google/desktop/session/${sessionId}`);
+    return response.data;
+}
