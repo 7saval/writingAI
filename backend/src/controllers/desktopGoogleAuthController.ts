@@ -26,7 +26,7 @@ if (!DESKTOP_REDIRECT_URI) {
  * POST /api/auth/google/desktop/session
  */
 export async function createDesktopGoogleSession(
-  req: Request,
+  _req: Request,
   res: Response,
   next: NextFunction,
 ) {

@@ -8,7 +8,10 @@
     "backend:dev": "npm run dev:server --prefix backend",
     "electron:dev": "concurrently \"npm run backend:dev\" \"npm run dev --prefix frontend\" \"wait-on http://localhost:5173 && tsc -p tsconfig.electron.json && cross-env ELECTRON_START_URL=http://localhost:5173 electron .\"",
     "electron:build": "cross-env VITE_API_URL=https://writingai-dcb3.onrender.com/api npm run build --prefix frontend && tsc -p tsconfig.electron.json && electron-builder",
-    "postinstall": "electron-rebuild -f -w better-sqlite3"
+    "postinstall": "electron-rebuild -f -w better-sqlite3",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint src --ext .ts",
+    "pre-commit": "npm run type-check && npm run lint"
   },
   "build": {
     "appId": "com.writingai.app",
@@ -32,11 +35,14 @@
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
+    "@typescript-eslint/eslint-plugin": "^8.60.0",
     "baseline-browser-mapping": "^2.10.8",
     "concurrently": "^9.2.1",
     "cross-env": "^10.1.0",
     "electron": "^31.2.0",
     "electron-builder": "^24.13.3",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
     "wait-on": "^9.0.4"
   }
 }

@@ -1,3 +1,5 @@
+/// <reference path="../types/express.d.ts" />
+
 import { Request, Response, NextFunction } from "express";
 import { AppDataSource } from "../data-source";
 import { Paragraph } from "../entity/Paragraphs";
@@ -10,41 +12,20 @@ export async function updateParagraph(
   req: Request,
   res: Response,
   next: NextFunction,
-) {
+): Promise<void> {
   try {
-    const repo = AppDataSource.getRepository(Paragraph);
-    const paragraph = await repo.findOne({
-      where: { id: Number(req.params.id) },
-      relations: ["project", "project.user"],
-    });
-
-    if (!paragraph) {
-      return res
-        .status(StatusCodes.NOT_FOUND)
-        .json({ message: "Paragraph not found" });
-    }
-
-    // 소유권 검증
-    if (paragraph.project.user.id !== req.user!.id) {
-      return res
-        .status(StatusCodes.FORBIDDEN)
-        .json({ message: "Forbidden" });
-    }
+    // 소유권 검증은 checkParagraphOwnership 미들웨어에서 처리됨
+    const paragraph = req.paragraph!;
 
     // 내용만 수정 가능
     if (req.body.content !== undefined) {
-      await repo.update({ id: Number(req.params.id) }, { content: req.body.content });
+      paragraph.content = req.body.content;
     }
 
-    // 업데이트된 단락 반환
-    const updatedParagraph = await repo.findOneBy({ id: Number(req.params.id) });
-    if (!updatedParagraph) {
-      return res
-        .status(StatusCodes.NOT_FOUND)
-        .json({ message: "Paragraph not found" });
-    }
+    const repo = AppDataSource.getRepository(Paragraph);
+    await repo.save(paragraph);
 
-    res.json(updatedParagraph);
+    res.json(paragraph);
   } catch (error) {
     next(error);
   }
@@ -55,31 +36,16 @@ export async function deleteParagraph(
   req: Request,
   res: Response,
   next: NextFunction,
-) {
+): Promise<void> {
   try {
+    // 소유권 검증은 checkParagraphOwnership 미들웨어에서 처리됨
+    const paragraph = req.paragraph!;
+
     const repo = AppDataSource.getRepository(Paragraph);
-    const paragraph = await repo.findOne({
-      where: { id: Number(req.params.id) },
-      relations: ["project", "project.user"],
-    });
-
-    if (!paragraph) {
-      return res
-        .status(StatusCodes.NOT_FOUND)
-        .json({ message: "Paragraph not found" });
-    }
-
-    // 소유권 검증
-    if (paragraph.project.user.id !== req.user!.id) {
-      return res
-        .status(StatusCodes.FORBIDDEN)
-        .json({ message: "Forbidden" });
-    }
-
     await repo.remove(paragraph);
     res.json({
       message: "Paragraph deleted successfully",
-      deletedId: Number(req.params.id),
+      deletedId: paragraph.id,
     });
   } catch (error) {
     next(error);
@@ -91,40 +57,21 @@ export async function regenerateAiParagraph(
   req: Request,
   res: Response,
   next: NextFunction,
-) {
+): Promise<void> {
   try {
-    const paragraphRepo = AppDataSource.getRepository(Paragraph);
-    const projectRepo = AppDataSource.getRepository(Project);
-
-    // 재생성할 단락 조회
-    const paragraph = await paragraphRepo.findOne({
-      where: {
-        id: Number(req.params.id),
-      },
-      relations: ["project", "project.user"],
-    });
-
-    if (!paragraph) {
-      return res
-        .status(StatusCodes.NOT_FOUND)
-        .json({ message: "Paragraph not found" });
-    }
-
-    // 소유권 검증
-    if (paragraph.project.user.id !== req.user!.id) {
-      return res
-        .status(StatusCodes.FORBIDDEN)
-        .json({ message: "Forbidden" });
-    }
+    // 소유권 검증은 checkParagraphOwnership 미들웨어에서 처리됨
+    const paragraph = req.paragraph!;
 
     // AI가 작성한 단락만 재생성 가능
     if (paragraph.writtenBy !== "ai") {
-      return res
+      res
         .status(StatusCodes.BAD_REQUEST)
         .json({ message: "Only AI paragraphs can be regenerated" });
+      return;
     }
 
     // 프로젝트와 이전 단락들 조회
+    const projectRepo = AppDataSource.getRepository(Project);
     const project = await projectRepo.findOne({
       where: {
         id: paragraph.project.id,
@@ -133,9 +80,10 @@ export async function regenerateAiParagraph(
     });
 
     if (!project) {
-      return res
+      res
         .status(StatusCodes.NOT_FOUND)
         .json({ message: "Project not found" });
+      return;
     }
 
     // 재생성할 단락 이전의 단락들만 컨텍스트로 사용
@@ -150,11 +98,12 @@ export async function regenerateAiParagraph(
     const aiText = await generateNextParagraph(
       project,
       previousParagraphs,
-      { temperature, maxTokens }, // 추가 옵션 전달
+      { temperature, maxTokens },
     );
 
     // 단락 내용 업데이트
     paragraph.content = aiText?.trim();
+    const paragraphRepo = AppDataSource.getRepository(Paragraph);
     await paragraphRepo.save(paragraph);
 
     res.status(StatusCodes.OK).json(paragraph);

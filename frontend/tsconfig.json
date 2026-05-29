@@ -13,6 +13,10 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
-    }
+    },
+    "noImplicitAny": true, // ❌ 암묵적 any 금지
+    "strict": true, // ✅ 엄격한 타입 검사 (권장)
+    "noUnusedLocals": true, // 사용 안 하는 변수 감지
+    "noUnusedParameters": true // 사용 안 하는 파라미터 감지
   }
 }

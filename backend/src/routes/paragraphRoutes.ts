@@ -5,14 +5,20 @@ import {
   updateParagraph,
 } from "../controllers/paragraphController";
 import { ensureAuth } from "../middleware/authMiddleware";
+import { checkParagraphOwnership } from "../middleware/authorizationMiddleware";
 
 export const paragraphRouter = Router();
 
-// 단락 수정
-paragraphRouter.put("/:id", ensureAuth, updateParagraph);
-
-// 단락 삭제
-paragraphRouter.delete("/:id", ensureAuth, deleteParagraph);
-
-// AI 단락 재생성
-paragraphRouter.post("/:id/regenerate", ensureAuth, regenerateAiParagraph);
+paragraphRouter.put("/:id", ensureAuth, checkParagraphOwnership, updateParagraph);
+paragraphRouter.delete(
+  "/:id",
+  ensureAuth,
+  checkParagraphOwnership,
+  deleteParagraph,
+);
+paragraphRouter.post(
+  "/:id/regenerate",
+  ensureAuth,
+  checkParagraphOwnership,
+  regenerateAiParagraph,
+);

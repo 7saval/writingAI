@@ -8,7 +8,7 @@ import { SocialAccount } from "../entity/SocialAccounts";
 import { OAuth2Client } from "google-auth-library";
 
 // 회원가입
-export async function signup(req: Request, res: Response, next: NextFunction) {
+export async function signup(req: Request, res: Response, _next: NextFunction) {
   try {
     const repo = AppDataSource.getRepository(User);
     const { email, password, username } = req.body;
@@ -106,7 +106,7 @@ export async function login(req: Request, res: Response, next: NextFunction) {
 }
 
 // 로그아웃
-export async function logout(req: Request, res: Response, next: NextFunction) {
+export async function logout(_req: Request, res: Response, next: NextFunction) {
   try {
     res.clearCookie("refreshToken");
     res.status(StatusCodes.OK).json({
@@ -170,12 +170,10 @@ export async function forgotPassword(
     await repo.save(user);
 
     // 이메일 발송
-    console.log(`인증코드: ${code}`);
     // await emailService.send(email, '비밀번호 초기화 인증코드', code);
 
     return res.status(StatusCodes.OK).json({
       message: "인증코드가 이메일로 전송되었습니다.",
-      code,
     });
   } catch (error) {
     next(error);
@@ -494,7 +492,7 @@ export async function completeSocialSignup(
 }
 
 // 토큰 갱신
-export async function refresh(req: Request, res: Response, next: NextFunction) {
+export async function refresh(req: Request, res: Response, _next: NextFunction) {
   try {
     const refreshToken = req.cookies.refreshToken || req.body.refreshToken;
 

@@ -1,3 +1,5 @@
+/// <reference path="../types/express.d.ts" />
+
 import { Request, Response, NextFunction } from "express";
 import { AppDataSource } from "../data-source";
 import { Project } from "../entity/Projects";
@@ -7,26 +9,10 @@ export const getContext = async (
   req: Request,
   res: Response,
   next: NextFunction,
-) => {
+): Promise<void> => {
   try {
-    const repo = AppDataSource.getRepository(Project);
-    const project = await repo.findOne({
-      where: { id: Number(req.params.id) },
-      relations: ["user"],
-    });
-
-    if (!project) {
-      return res
-        .status(StatusCodes.NOT_FOUND)
-        .json({ message: "Project not found" });
-    }
-
-    // 소유권 검증
-    if (project.user.id !== req.user!.id) {
-      return res
-        .status(StatusCodes.FORBIDDEN)
-        .json({ message: "Forbidden" });
-    }
+    // 소유권 검증은 checkContextOwnership 미들웨어에서 처리됨
+    const project = req.project!;
 
     res.status(StatusCodes.OK).json({
       synopsis: project.synopsis ?? "",
@@ -41,26 +27,10 @@ export async function updateContext(
   req: Request,
   res: Response,
   next: NextFunction,
-) {
+): Promise<void> {
   try {
-    const repo = AppDataSource.getRepository(Project);
-    const project = await repo.findOne({
-      where: { id: Number(req.params.id) },
-      relations: ["user"],
-    });
-
-    if (!project) {
-      return res
-        .status(StatusCodes.NOT_FOUND)
-        .json({ message: "Project not found" });
-    }
-
-    // 소유권 검증
-    if (project.user.id !== req.user!.id) {
-      return res
-        .status(StatusCodes.FORBIDDEN)
-        .json({ message: "Forbidden" });
-    }
+    // 소유권 검증은 checkContextOwnership 미들웨어에서 처리됨
+    const project = req.project!;
 
     // 업데이트할 필드만 수정
     if (req.body.synopsis !== undefined) {
@@ -79,6 +49,8 @@ export async function updateContext(
       }
       project.lorebook = lorebookData;
     }
+
+    const repo = AppDataSource.getRepository(Project);
     await repo.save(project);
 
     res.status(StatusCodes.OK).json({

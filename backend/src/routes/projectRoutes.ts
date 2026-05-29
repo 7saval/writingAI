@@ -8,12 +8,23 @@ import {
   updateProject,
 } from "../controllers/projectController";
 import { ensureAuth } from "../middleware/authMiddleware";
+import { checkProjectOwnership } from "../middleware/authorizationMiddleware";
 
 export const projectRouter = Router();
 
 projectRouter.post("/", ensureAuth, createProject);
 projectRouter.get("/", ensureAuth, getProjects);
-projectRouter.get("/:id", ensureAuth, getProjectDetail);
-projectRouter.get("/:id/paragraphs", ensureAuth, getProjectParagraphs); // 프로젝트 단락 조회
-projectRouter.put("/:id", ensureAuth, updateProject);
-projectRouter.delete("/:id", ensureAuth, deleteProject); // 프로젝트 삭제
+projectRouter.get("/:id", ensureAuth, checkProjectOwnership, getProjectDetail);
+projectRouter.get(
+  "/:id/paragraphs",
+  ensureAuth,
+  checkProjectOwnership,
+  getProjectParagraphs,
+);
+projectRouter.put("/:id", ensureAuth, checkProjectOwnership, updateProject);
+projectRouter.delete(
+  "/:id",
+  ensureAuth,
+  checkProjectOwnership,
+  deleteProject,
+);

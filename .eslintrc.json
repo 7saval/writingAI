@@ -1,0 +1,13 @@
+{
+  "parser": "@typescript-eslint/parser",
+  "extends": [
+    "plugin:@typescript-eslint/recommended",
+    "plugin:@typescript-eslint/recommended-requiring-type-checking"
+  ],
+  "rules": {
+    "@typescript-eslint/no-explicit-any": "error",
+    "@typescript-eslint/no-implicit-any": "error",
+    "@typescript-eslint/explicit-function-return-types": "warn",
+    "@typescript-eslint/explicit-module-boundary-types": "warn"
+  }
+}

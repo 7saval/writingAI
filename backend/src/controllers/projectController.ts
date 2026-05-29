@@ -1,16 +1,17 @@
+/// <reference path="../types/express.d.ts" />
+
 import { NextFunction, Request, Response } from "express";
 import { AppDataSource } from "../data-source";
 import { Project } from "../entity/Projects";
 import { StatusCodes } from "http-status-codes";
 import { Paragraph } from "../entity/Paragraphs";
-import jwt from "jsonwebtoken";
 
 // 프로젝트 생성
 export async function createProject(
   req: Request,
   res: Response,
   next: NextFunction,
-) {
+): Promise<void> {
   try {
     const repo = AppDataSource.getRepository(Project);
     const project = repo.create({
@@ -24,7 +25,7 @@ export async function createProject(
     await repo.save(project);
     res.status(StatusCodes.CREATED).json(project);
   } catch (error) {
-    next(error); // 에러 핸들러로 전달
+    next(error);
   }
 }
 
@@ -33,7 +34,7 @@ export async function getProjects(
   req: Request,
   res: Response,
   next: NextFunction,
-) {
+): Promise<void> {
   try {
     const userId = req.user!.id;
 
@@ -44,11 +45,11 @@ export async function getProjects(
       },
       order: {
         createdAt: "DESC",
-      }, // 최신순 정렬
+      },
     });
     res.status(StatusCodes.OK).json(list);
   } catch (error) {
-    next(error); // 에러 핸들러로 전달
+    next(error);
   }
 }
 
@@ -57,44 +58,30 @@ export async function getProjectDetail(
   req: Request,
   res: Response,
   next: NextFunction,
-) {
+): Promise<void> {
   try {
-    const repo = AppDataSource.getRepository(Project);
-    const projectId = Number(req.params.id);
+    // 소유권 검증은 checkProjectOwnership 미들웨어에서 처리됨
+    let project: Project | null = req.project ?? null;
 
-    if (isNaN(projectId)) {
-      return res
-        .status(StatusCodes.BAD_REQUEST)
-        .json({ message: "Invalid project ID" });
+    if (!project) {
+      const projectRepo = AppDataSource.getRepository(Project);
+      project = await projectRepo.findOne({
+        where: { id: Number(req.params.id) },
+        relations: ["paragraphs", "user"],
+        order: { paragraphs: { orderIndex: "ASC" } },
+      });
     }
 
-    const project = await repo.findOne({
-      where: {
-        id: projectId,
-      },
-      relations: ["paragraphs", "user"],
-      order: {
-        paragraphs: {
-          orderIndex: "ASC",
-        },
-      },
-    });
-
-    if (!project)
-      return res
+    if (!project) {
+      res
         .status(StatusCodes.NOT_FOUND)
         .json({ message: "Project not found" });
-
-    // 소유권 검증
-    if (project.user.id !== req.user!.id) {
-      return res
-        .status(StatusCodes.FORBIDDEN)
-        .json({ message: "Forbidden" });
+      return;
     }
 
     res.status(StatusCodes.OK).json(project);
   } catch (error) {
-    next(error); // 에러 핸들러로 전달
+    next(error);
   }
 }
 
@@ -103,28 +90,10 @@ export async function updateProject(
   req: Request,
   res: Response,
   next: NextFunction,
-) {
+): Promise<void> {
   try {
-    const repo = AppDataSource.getRepository(Project);
-    const project = await repo.findOne({
-      where: {
-        id: Number(req.params.id),
-      },
-      relations: ["user"],
-    });
-
-    if (!project) {
-      return res
-        .status(StatusCodes.NOT_FOUND)
-        .json({ message: "Project not found" });
-    }
-
-    // 소유자 확인
-    if (project.user.id !== req.user!.id) {
-      return res
-        .status(StatusCodes.FORBIDDEN)
-        .json({ message: "Forbidden" });
-    }
+    // 소유권 검증은 checkProjectOwnership 미들웨어에서 처리됨
+    const project = req.project!;
 
     // 업데이트할 필드만 수정
     if (req.body.title !== undefined) project.title = req.body.title;
@@ -146,6 +115,7 @@ export async function updateProject(
       project.lorebook = lorebookData;
     }
 
+    const repo = AppDataSource.getRepository(Project);
     await repo.save(project);
     res.status(StatusCodes.OK).json(project);
   } catch (error) {
@@ -158,35 +128,12 @@ export async function deleteProject(
   req: Request,
   res: Response,
   next: NextFunction,
-) {
+): Promise<void> {
   try {
+    // 소유권 검증은 checkProjectOwnership 미들웨어에서 처리됨
+    const project = req.project!;
+
     const repo = AppDataSource.getRepository(Project);
-    const projectId = Number(req.params.id);
-
-    if (isNaN(projectId)) {
-      return res
-        .status(StatusCodes.BAD_REQUEST)
-        .json({ message: "Invalid project ID" });
-    }
-
-    const project = await repo.findOne({
-      where: { id: projectId },
-      relations: ["user"],
-    });
-
-    if (!project) {
-      return res
-        .status(StatusCodes.NOT_FOUND)
-        .json({ message: "Project not found" });
-    }
-
-    // 소유권 검증
-    if (project.user.id !== req.user!.id) {
-      return res
-        .status(StatusCodes.FORBIDDEN)
-        .json({ message: "Forbidden" });
-    }
-
     await repo.remove(project);
     res
       .status(StatusCodes.OK)
@@ -201,36 +148,12 @@ export async function getProjectParagraphs(
   req: Request,
   res: Response,
   next: NextFunction,
-) {
+): Promise<void> {
   try {
-    const projectRepo = AppDataSource.getRepository(Project);
-    const paragraphRepo = AppDataSource.getRepository(Paragraph);
+    // 프로젝트 소유권은 checkProjectOwnership 미들웨어에서 검증됨
     const projectId = Number(req.params.id);
 
-    if (isNaN(projectId)) {
-      return res
-        .status(StatusCodes.BAD_REQUEST)
-        .json({ message: "Invalid project ID" });
-    }
-
-    // 프로젝트 소유권 확인
-    const project = await projectRepo.findOne({
-      where: { id: projectId },
-      relations: ["user"],
-    });
-
-    if (!project) {
-      return res
-        .status(StatusCodes.NOT_FOUND)
-        .json({ message: "Project not found" });
-    }
-
-    if (project.user.id !== req.user!.id) {
-      return res
-        .status(StatusCodes.FORBIDDEN)
-        .json({ message: "Forbidden" });
-    }
-
+    const paragraphRepo = AppDataSource.getRepository(Paragraph);
     const paragraphs = await paragraphRepo.find({
       where: {
         project: { id: projectId },
@@ -241,9 +164,10 @@ export async function getProjectParagraphs(
     });
 
     if (!paragraphs || paragraphs.length === 0) {
-      return res
+      res
         .status(StatusCodes.NOT_FOUND)
         .json({ message: "Paragraphs not found" });
+      return;
     }
 
     res.status(StatusCodes.OK).json(paragraphs);

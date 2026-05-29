@@ -1,3 +1,5 @@
+/// <reference path="./types/express.d.ts" />
+
 if (process.env.NODE_ENV !== "production") {
     import("dotenv/config");
 }
