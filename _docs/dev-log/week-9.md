@@ -491,6 +491,17 @@ Week 9: ███░░ 30%
 - 긴 문단이 많은 시나리오에서 CSS 브레이크 제어보다 코드 기반 페이지 분할이 더 안정적이었다.
 - 따라서 이번 요구사항은 `html2pdf.js`보다 `jsPDF`가 더 잘 맞는 문제 유형이었다.
 
+PDF 내보내기 라이브러리 비교
+| 비교 항목 | html2pdf.js (기존 방식) | jsPDF (전환 방식) |
+| :--- | :--- | :--- |
+| 작동 원리 | DOM 캡처 방식 (html2canvas 활용) | 좌표 기반 직접 렌더링 |
+| 제어 수준 | HTML/CSS 기반의 일괄 변환 | 픽셀/좌표 단위의 세밀한 통제 |
+| 페이지 분할 | 브라우저 엔진에 의존 (문단 잘림 발생) | 알고리즘 기반 직접 제어 (자연스러운 연결) |
+| 구현 난이도 | 낮음 (기존 UI 그대로 활용 가능) | 높음 (레이아웃 로직 직접 설계 필요) |
+| 출력 품질 | 화면 캡처본 느낌 (Raster 위주) | 정교한 문서 결과물 (Vector/Text 위주) |
+| 한글 대응 | 브라우저 폰트 렌더링에 의존 | VFS 기반 수동 폰트 등록 필수 |
+| 주요 용도 | 단순 대시보드/화면 복제형 PDF | 정교한 리포트/문서 생성형 PDF |
+
 **2. `jsPDF` 주요 기능 정리**
 
 - 참고링크 : [https://www.npmjs.com/package/jspdf](https://www.npmjs.com/package/jspdf)
@@ -579,6 +590,7 @@ Week 9: ███░░ 30%
 ### 📅 2026-04-08 (Day 33)
 
 #### 🎯 오늘 목표
+
 - [x] Electron Word export 구현 계획 수립
 - [x] 웹 Word 생성 로직을 공통 레이어로 분리
 - [x] Electron 저장용 IPC 추가
@@ -749,18 +761,17 @@ const buffer = await buildWordArrayBuffer(exportDocument);
 await window.electron.saveWordDocument(filename, buffer);
 
 // preload
-saveWordDocument: (filename, data) =>
+saveWordDocument: ((filename, data) =>
   ipcRenderer.invoke("save-word-document", filename, data),
+  // main
+  ipcMain.handle("save-word-document", async (_event, filename, data) => {
+    const { filePath } = await dialog.showSaveDialog(mainWindow, {
+      defaultPath: filename,
+    });
 
-// main
-ipcMain.handle("save-word-document", async (_event, filename, data) => {
-  const { filePath } = await dialog.showSaveDialog(mainWindow, {
-    defaultPath: filename,
-  });
-
-  await fs.promises.writeFile(filePath, Buffer.from(new Uint8Array(data)));
-  return { success: true };
-});
+    await fs.promises.writeFile(filePath, Buffer.from(new Uint8Array(data)));
+    return { success: true };
+  }));
 ```
 
 - 렌더러는 Word 바이너리를 만든다.
