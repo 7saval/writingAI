@@ -63,7 +63,7 @@ export async function getProjectDetail(
     // 소유권 검증은 checkProjectOwnership 미들웨어에서 처리됨
     let project: Project | null = req.project ?? null;
 
-    if (!project) {
+    if (!project || !project.paragraphs) {
       const projectRepo = AppDataSource.getRepository(Project);
       project = await projectRepo.findOne({
         where: { id: Number(req.params.id) },
@@ -106,11 +106,14 @@ export async function updateProject(
       let lorebookData = req.body.lorebook;
       if (typeof lorebookData === "string") {
         try {
-          lorebookData = JSON.parse(lorebookData);
+          const parsed = JSON.parse(lorebookData);
+          lorebookData = Array.isArray(parsed) ? parsed : [];
         } catch (e) {
           console.warn("Failed to parse lorebook JSON string:", e);
           lorebookData = [];
         }
+      } else if (!Array.isArray(lorebookData)) {
+        lorebookData = [];
       }
       project.lorebook = lorebookData;
     }

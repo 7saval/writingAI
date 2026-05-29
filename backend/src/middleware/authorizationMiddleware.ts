@@ -39,7 +39,7 @@ export async function checkProjectOwnership(
     }
 
     // 소유권 검증
-    if (project.user.id !== req.user!.id) {
+    if (!req.user || project.user.id !== req.user.id) {
       res
         .status(StatusCodes.FORBIDDEN)
         .json({ message: "Forbidden" });
@@ -88,7 +88,7 @@ export async function checkParagraphOwnership(
     }
 
     // 단락이 속한 프로젝트의 소유권 검증
-    if (paragraph.project.user.id !== req.user!.id) {
+    if (!req.user || paragraph.project.user.id !== req.user.id) {
       res
         .status(StatusCodes.FORBIDDEN)
         .json({ message: "Forbidden" });
@@ -137,7 +137,7 @@ export async function checkContextOwnership(
     }
 
     // 소유권 검증
-    if (project.user.id !== req.user!.id) {
+    if (!req.user || project.user.id !== req.user.id) {
       res
         .status(StatusCodes.FORBIDDEN)
         .json({ message: "Forbidden" });
@@ -213,7 +213,7 @@ export function checkResourceOwnership(
           ? (resource as Paragraph).project.user.id
           : (resource as Project).user.id;
 
-      if (ownerId !== req.user!.id) {
+      if (!req.user || ownerId !== req.user.id) {
         res
           .status(StatusCodes.FORBIDDEN)
           .json({ message: "Forbidden" });
