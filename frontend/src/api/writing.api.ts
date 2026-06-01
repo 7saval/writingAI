@@ -1,5 +1,6 @@
 import { apiClient } from "./client";
 import type { Paragraph } from "@/types/database";
+import { useAuthStore } from "@/store/authStore";
 
 // 단락 작성
 export const writeParagraph = async (
@@ -33,12 +34,14 @@ export const writeParagraphStream = async (
   stage?: string,
 ) => {
   const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+  const accessToken = useAuthStore.getState().accessToken;
 
   try {
     const response = await fetch(`${apiUrl}/writing/${projectId}/write/stream`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       },
       body: JSON.stringify({
         content,
@@ -66,8 +69,8 @@ export const writeParagraphStream = async (
 
       buffer += decoder.decode(value, { stream: true });
 
-      // SSE 이벤트 파싱 (data: ...\n\n 형식)
-      const lines = buffer.split("\n\n");
+      // SSE 이벤트 파싱 (라인 단위로 분할하여 안전하게 처리)
+      const lines = buffer.split(/\r?\n/);
 
       // 마지막 불완전한 라인은 다음 반복을 위해 버퍼에 유지
       buffer = lines[lines.length - 1];

@@ -120,7 +120,7 @@ export async function writeWithAiStream(
     );
 
     // 2. AI 단락 생성 (빈 content로 먼저 저장)
-    const aiParagraph = paragraphRepo.create({
+    let aiParagraph = paragraphRepo.create({
       project,
       content: "",
       writtenBy: "ai",
@@ -138,38 +138,70 @@ export async function writeWithAiStream(
 
     // 3. AI 단락 생성 및 스트리밍
     let fullContent = "";
-    const stream = generateNextParagraphStream(
-      project,
-      [...project.paragraphs, userParagraph],
-      {
-        prompt: req.body.prompt,
-        stage: req.body.stage,
-      },
-    );
+    const abortController = new AbortController();
 
-    for await (const chunk of stream) {
-      fullContent += chunk;
+    const handleClose = () => {
+      abortController.abort();
+      if (fullContent.trim() === "") {
+        paragraphRepo.remove(aiParagraph).catch(console.error);
+      } else {
+        aiParagraph.content = fullContent.trim();
+        paragraphRepo.save(aiParagraph).catch(console.error);
+      }
+    };
+
+    req.on("close", handleClose);
+
+    try {
+      const stream = generateNextParagraphStream(
+        project,
+        [...project.paragraphs, userParagraph],
+        {
+          prompt: req.body.prompt,
+          stage: req.body.stage,
+          signal: abortController.signal,
+        },
+      );
+
+      for await (const chunk of stream) {
+        fullContent += chunk;
+        res.write(
+          `data: ${JSON.stringify({
+            type: "chunk",
+            content: chunk,
+          })}\n\n`,
+        );
+      }
+
+      // 4. 완료 후 AI 단락 content 업데이트
+      aiParagraph.content = fullContent.trim();
+      await paragraphRepo.save(aiParagraph);
+
+      // 완료 이벤트 전송
       res.write(
         `data: ${JSON.stringify({
-          type: "chunk",
-          content: chunk,
+          type: "done",
+          paragraph: aiParagraph,
         })}\n\n`,
       );
+
+      res.end();
+    } catch (streamError) {
+      // 스트림 중 에러 발생 시 처리
+      console.error("writeWithAiStream error during streaming:", streamError);
+      if (fullContent.trim() === "") {
+        await paragraphRepo.remove(aiParagraph);
+      }
+      res.write(
+        `data: ${JSON.stringify({
+          type: "error",
+          message: streamError instanceof Error ? streamError.message : "Stream error",
+        })}\n\n`,
+      );
+      res.end();
+    } finally {
+      req.off("close", handleClose);
     }
-
-    // 4. 완료 후 AI 단락 content 업데이트
-    aiParagraph.content = fullContent.trim();
-    await paragraphRepo.save(aiParagraph);
-
-    // 완료 이벤트 전송
-    res.write(
-      `data: ${JSON.stringify({
-        type: "done",
-        paragraph: aiParagraph,
-      })}\n\n`,
-    );
-
-    res.end();
   } catch (error) {
     console.error("writeWithAiStream error:", error);
     res.write(
