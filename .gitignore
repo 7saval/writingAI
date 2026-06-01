@@ -5,8 +5,8 @@
 .mcp.json
 
 # Portfolio
- _docs/portfolio/
- 
+_docs/portfolio/
+
 # Electron build output
 release/
 dist-electron/
