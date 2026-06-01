@@ -105,8 +105,8 @@ function ParagraphItem({
         </strong>
         {/* 액션 버튼들 (호버 시 표시) */}
         <div className="flex gap-2 opacity-0 transition-opacity group-hover:opacity-100">
-          {/* 수정 버튼 */}
-          {!isEditing && (
+          {/* 수정 버튼 (스트리밍 중 비활성화) */}
+          {!isEditing && !paragraph.isStreaming && (
             <button
               onClick={() => setIsEditing(true)}
               className="text-xs text-slate-500 hover:text-primary"
@@ -115,8 +115,8 @@ function ParagraphItem({
             </button>
           )}
 
-          {/* AI 재생성 버튼 (AI 단락만) */}
-          {paragraph.writtenBy === "ai" && !isEditing && (
+          {/* AI 재생성 버튼 (AI 단락만, 스트리밍 중 비활성화) */}
+          {paragraph.writtenBy === "ai" && !isEditing && !paragraph.isStreaming && (
             <button
               onClick={handleRegenerate}
               disabled={isRegenerating}
@@ -125,13 +125,15 @@ function ParagraphItem({
               {isRegenerating ? "재생성 중..." : "🔄 재생성"}
             </button>
           )}
-          {/* 삭제 버튼 */}
-          <button
-            onClick={handleDelete}
-            className="text-xs text-slate-500 hover:text-red-500"
-          >
-            삭제
-          </button>
+          {/* 삭제 버튼 (스트리밍 중 비활성화) */}
+          {!paragraph.isStreaming && (
+            <button
+              onClick={handleDelete}
+              className="text-xs text-slate-500 hover:text-red-500"
+            >
+              삭제
+            </button>
+          )}
         </div>
       </div>
 
@@ -152,7 +154,7 @@ function ParagraphItem({
           <textarea
             value={editContent}
             onChange={(e) => setEditContent(e.target.value)}
-            className="w-full rounded-lg border border-border bg-white p-2 text-xs 
+            className="w-full rounded-lg border border-border bg-white p-2 text-xs
                                     focus:border-primary focus:outline-none"
             rows={4}
           />
@@ -168,7 +170,7 @@ function ParagraphItem({
                 setIsEditing(false);
                 setEditContent(paragraph.content);
               }}
-              className="rounded-lg bg-slate-200 px-3 py-1 text-xs text-slate-700 
+              className="rounded-lg bg-slate-200 px-3 py-1 text-xs text-slate-700
                                         hover:bg-slate-300"
             >
               취소
@@ -177,8 +179,8 @@ function ParagraphItem({
         </div>
       ) : (
         <p className="whitespace-pre-line text-slate-900">
-          {displayedContent}
-          {isTyping && (
+          {paragraph.isStreaming ? paragraph.content : displayedContent}
+          {(paragraph.isStreaming || isTyping) && (
             <span className="ml-1 inline-block h-4 w-2 animate-pulse bg-slate-400 align-middle"></span>
           )}
         </p>

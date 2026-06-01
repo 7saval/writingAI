@@ -91,6 +91,71 @@ export async function generateNextParagraph(
   return response.choices[0].message.content;
 }
 
+// 다음 단락 생성 (스트리밍 버전)
+export async function* generateNextParagraphStream(
+  project: Project,
+  paragraphs: Paragraph[],
+  options?: GenerationOptions & { prompt?: string; stage?: string },
+) {
+  const messages = buildContext(project, paragraphs, {
+    includeSynopsis: true,
+    includeLorebook: true,
+    includeDescription: true,
+    maxParagraphs: 10,
+    stage: options?.stage,
+  });
+
+  const genrePrompts: Record<string, string> = {
+    판타지: `You are a Korean-language fantasy novel writing assistant. Produce vivid, atmospheric descriptions, rich world-building, and immersive magical elements. Maintain internal logic for magic systems, geography, and character motivations.`,
+    로맨스: `You are a Korean-language romance novel writing assistant. Focus on emotional nuance, character chemistry, unspoken tension, and internal conflict.`,
+    미스터리: `You are a Korean-language mystery novel writing assistant. Maintain suspense, subtle clue placement, and logical plot progression.`,
+    스릴러: `You are a Korean-language thriller novel writing assistant. Emphasize tension, pace, and psychological pressure.`,
+    SF: `You are a Korean-language science fiction novel writing assistant. Use sharp, clean prose with grounded scientific plausibility.`,
+    호러: `You are a Korean-language horror novel writing assistant. Prioritize dread, atmosphere, sensory discomfort, and slow-burning fear.`,
+    드라마: `You are a Korean-language drama novel writing assistant. Focus on relationships, emotional growth, conflicts, and personal stakes.`,
+    기타: `You are a Korean-language creative writing assistant for novels of any genre. Adapt your tone, pacing, and style according to the user's intent.`,
+  };
+
+  const genrePrompt = genrePrompts[project.genre || "기타"];
+
+  const systemMessage: OpenAI.Chat.ChatCompletionMessageParam = {
+    role: "system",
+    content: `${BASE_PROMPT}\n\n[Genre Specific Guide]\n${genrePrompt}`,
+  };
+
+  const finalMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+    systemMessage,
+    ...messages,
+  ];
+
+  if (options?.prompt) {
+    finalMessages.push({
+      role: "user",
+      content: `[사용자 지시사항]\n${options.prompt}\n\n위 지시사항을 반영하여 다음 단락을 이어서 작성해 주세요.`,
+    });
+  } else {
+    finalMessages.push({
+      role: "user",
+      content: "AI, 다음 단락을 작성해 주세요.",
+    });
+  }
+
+  const stream = await client.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: finalMessages,
+    temperature: options?.temperature ?? 0.8,
+    max_tokens: options?.maxTokens ?? 500,
+    stream: true,
+  });
+
+  for await (const chunk of stream) {
+    const content = chunk.choices[0]?.delta?.content;
+    if (content) {
+      yield content;
+    }
+  }
+}
+
 // 프로젝트 컨텍스트 생성
 export function buildContext(
   project: Project,

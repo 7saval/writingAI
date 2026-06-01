@@ -28,6 +28,7 @@ export interface Paragraph {
   updatedAt: Date;
   isLoading?: boolean;
   isTyping?: boolean;
+  isStreaming?: boolean;
 }
 
 export type ParagraphWrite = Pick<Paragraph, "id" | "content" | "writtenBy">;
