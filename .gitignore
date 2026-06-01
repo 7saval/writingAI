@@ -4,6 +4,9 @@
 .antigravityrules
 .mcp.json
 
+# Portfolio
+ _docs/portfolio/
+ 
 # Electron build output
 release/
 dist-electron/

@@ -27,14 +27,14 @@ export interface ContextOptions {
 interface GenerationOptions {
   temperature?: number;
   maxTokens?: number;
+  signal?: AbortSignal;
 }
 
-// 다음 단락 생성
-export async function generateNextParagraph(
+function prepareFinalMessages(
   project: Project,
   paragraphs: Paragraph[],
-  options?: GenerationOptions & { prompt?: string; stage?: string },
-) {
+  options?: GenerationOptions & { prompt?: string; stage?: string }
+): OpenAI.Chat.ChatCompletionMessageParam[] {
   const messages = buildContext(project, paragraphs, {
     includeSynopsis: true,
     includeLorebook: true,
@@ -51,24 +51,32 @@ export async function generateNextParagraph(
     SF: `You are a Korean-language science fiction novel writing assistant. Use sharp, clean prose with grounded scientific plausibility.`,
     호러: `You are a Korean-language horror novel writing assistant. Prioritize dread, atmosphere, sensory discomfort, and slow-burning fear.`,
     드라마: `You are a Korean-language drama novel writing assistant. Focus on relationships, emotional growth, conflicts, and personal stakes.`,
-    기타: `You are a Korean-language creative writing assistant for novels of any genre. Adapt your tone, pacing, and style according to the user’s intent.`,
+    기타: `You are a Korean-language creative writing assistant for novels of any genre. Adapt your tone, pacing, and style according to the user's intent.`,
   };
 
-  const genrePrompt = genrePrompts[project.genre || "기타"];
+  const genreMap: Record<string, string> = {
+    Fantasy: "판타지",
+    Romance: "로맨스",
+    Mystery: "미스터리",
+    Thriller: "스릴러",
+    SciFi: "SF",
+    Horror: "호러",
+    Drama: "드라마"
+  };
 
-  // System 메시지 결합
+  const koreanGenre = project.genre ? genreMap[project.genre] || project.genre : "기타";
+  const genrePrompt = genrePrompts[koreanGenre] || genrePrompts["기타"];
+
   const systemMessage: OpenAI.Chat.ChatCompletionMessageParam = {
     role: "system",
     content: `${BASE_PROMPT}\n\n[Genre Specific Guide]\n${genrePrompt}`,
   };
 
-  // 대화 흐름 구성: [System, ...ContextMessages]
   const finalMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [
     systemMessage,
     ...messages,
   ];
 
-  // 사용자 방향 지시사항이 있는 경우 마지막에 추가
   if (options?.prompt) {
     finalMessages.push({
       role: "user",
@@ -81,14 +89,51 @@ export async function generateNextParagraph(
     });
   }
 
+  return finalMessages;
+}
+
+// 다음 단락 생성
+export async function generateNextParagraph(
+  project: Project,
+  paragraphs: Paragraph[],
+  options?: GenerationOptions & { prompt?: string; stage?: string },
+) {
+  const finalMessages = prepareFinalMessages(project, paragraphs, options);
+
   const response = await client.chat.completions.create({
     model: "gpt-4o-mini",
     messages: finalMessages,
     temperature: options?.temperature ?? 0.8,
     max_tokens: options?.maxTokens ?? 500,
+    ...(options?.signal && { signal: options.signal }),
   });
 
   return response.choices[0].message.content;
+}
+
+// 다음 단락 생성 (스트리밍 버전)
+export async function* generateNextParagraphStream(
+  project: Project,
+  paragraphs: Paragraph[],
+  options?: GenerationOptions & { prompt?: string; stage?: string },
+) {
+  const finalMessages = prepareFinalMessages(project, paragraphs, options);
+
+  const stream = await client.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: finalMessages,
+    temperature: options?.temperature ?? 0.8,
+    max_tokens: options?.maxTokens ?? 500,
+    stream: true,
+    ...(options?.signal && { signal: options.signal }),
+  });
+
+  for await (const chunk of stream) {
+    const content = chunk.choices[0]?.delta?.content;
+    if (content) {
+      yield content;
+    }
+  }
 }
 
 // 프로젝트 컨텍스트 생성

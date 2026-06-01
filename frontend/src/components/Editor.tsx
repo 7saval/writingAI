@@ -12,9 +12,9 @@ import { buildWordArrayBuffer } from "@/features/export/word/buildWordBuffer";
 import { useProjectDetailQuery } from "@/hooks/useProjects";
 import { useProjectParagraphsQuery } from "@/hooks/useParagraphs";
 import { useToast } from "@/hooks/useToast";
-import { useWriteParagraphMutation } from "@/hooks/useWriting";
 import { showAlert } from "@/store/useDialogStore";
 import { useWritingStore } from "@/store/useWritingStore";
+import { writeParagraphStream } from "@/api/writing.api";
 import type { Paragraph } from "@/types/database";
 
 function Editor() {
@@ -33,7 +33,6 @@ function Editor() {
   const { data: fetchedParagraphs } =
     useProjectParagraphsQuery(numericProjectId);
   const { data: projectDetail } = useProjectDetailQuery(numericProjectId);
-  const { mutateAsync: writeParagraphAsync } = useWriteParagraphMutation();
 
   useEffect(() => {
     if (fetchedParagraphs) {
@@ -80,41 +79,62 @@ function Editor() {
       orderIndex: paragraphs.length + 1,
       createdAt: new Date(),
       updatedAt: new Date(),
-      isLoading: true,
+      isStreaming: true,
     };
 
     setParagraphs((prev) => [...prev, tempUserParagraph, tempAiParagraph]);
     setIsLoading(true);
 
     try {
-      const response = await writeParagraphAsync({
-        projectId: numericProjectId,
-        content: userInput,
-        prompt: currentDirective || undefined,
-      });
-
-      setParagraphs((prev) =>
-        prev.map((paragraph) => {
-          if (paragraph.id === tempUserId) {
-            return response.userParagraph;
-          }
-
-          if (paragraph.id === tempAiId) {
-            return { ...response.aiParagraph, isTyping: true };
-          }
-
-          return paragraph;
-        }),
+      await writeParagraphStream(
+        numericProjectId,
+        userInput,
+        {
+          onUserParagraph: (paragraph) => {
+            setParagraphs((prev) =>
+              prev.map((p) => (p.id === tempUserId ? paragraph : p))
+            );
+          },
+          onAiStart: (paragraph) => {
+            setParagraphs((prev) =>
+              prev.map((p) =>
+                p.id === tempAiId
+                  ? {
+                      ...p,
+                      ...paragraph,
+                      id: tempAiId, // ID 유지해야 onChunk에서 찾을 수 있음
+                      isStreaming: true,
+                      content: "",
+                    }
+                  : p
+              )
+            );
+          },
+          onChunk: (content) => {
+            setParagraphs((prev) =>
+              prev.map((p) =>
+                p.id === tempAiId ? { ...p, content: p.content + content } : p
+              )
+            );
+          },
+          onDone: (paragraph) => {
+            setParagraphs((prev) =>
+              prev.map((p) =>
+                p.id === tempAiId ? { ...paragraph, isStreaming: false } : p
+              )
+            );
+          },
+          onError: async (error) => {
+            console.error("Failed to write paragraph:", error);
+            setParagraphs((prev) =>
+              prev.filter((p) => p.id !== tempUserId && p.id !== tempAiId)
+            );
+            setInput(userInput);
+            await showAlert("문단 생성에 실패했습니다. 다시 시도해 주세요.");
+          },
+        },
+        currentDirective || undefined,
       );
-    } catch (error) {
-      console.error("Failed to write paragraph:", error);
-      setParagraphs((prev) =>
-        prev.filter((paragraph) => {
-          return paragraph.id !== tempUserId && paragraph.id !== tempAiId;
-        }),
-      );
-      setInput(userInput);
-      await showAlert("문단 생성에 실패했습니다. 다시 시도해 주세요.");
     } finally {
       setIsLoading(false);
     }
