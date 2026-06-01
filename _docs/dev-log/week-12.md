@@ -1068,15 +1068,56 @@ onAiStart: (paragraph) => {
 - ✅ 토큰 실시간 누적으로 점진적 출력
 - ✅ 스트리밍 완료 후 커서 사라짐
 
+**4. BOLA (Broken Object Level Authorization) 취약점 해결**
+
+**문제점:**
+- `/write` 및 `/write/stream` 엔드포인트에 인증/인가 미들웨어가 누락되어 로그인하지 않은 사용자나 타인이 임의로 글을 생성할 수 있는 심각한 보안 취약점 존재.
+
+**해결 방법:**
+- `writingRoutes.ts`에 `ensureAuth` 및 `checkProjectOwnership` 미들웨어 추가 적용.
+- (해결 과정에서 기존 계획된 `스트리밍 엔드포인트에 ensureAuth 미들웨어 추가 검토` 항목 완료 처리됨)
+
+**5. SSE 스트리밍 도중 클라이언트 연결 해제 시 리소스 누수 방지**
+
+**문제점:**
+- 스트리밍 중 브라우저 탭을 닫거나 요청을 취소하면 서버는 계속해서 OpenAI API를 호출하며 토큰을 낭비함.
+- 예외 발생 시 DB에 내용이 비어있는(`""`) 단락이 그대로 남는 문제 발생.
+
+**해결 방법:**
+- `writingController.ts`에 `req.on('close')` 이벤트를 리스닝하여 연결 종료 감지.
+- `AbortController`를 도입해 `client.chat.completions.create`에 `signal`을 전달하여 OpenAI API 스트림 즉시 취소.
+- 스트림 취소 또는 에러 발생 시 `fullContent`가 비어있다면 해당 임시 단락(`aiParagraph`)을 DB에서 `remove` 처리하여 정합성 유지.
+
+**6. 영문 장르명의 프롬프트 맵핑 누락 및 타입 안정성 개선**
+
+**문제점:**
+- DB에 저장된 영문 장르(`Fantasy`, `Romance` 등)가 한글 키를 사용하는 `genrePrompts`와 매칭되지 않아 프롬프트에 `undefined`가 주입되는 버그.
+- `aiService.ts`에서 불필요한 `as any` 타입 캐스팅 및 코드 중복 발생.
+
+**해결 방법:**
+- `aiService.ts` 내에 `genreMap`을 추가하여 영문 장르를 한글 키로 안전하게 변환.
+- `generateNextParagraph`와 `generateNextParagraphStream`의 중복 로직을 `prepareFinalMessages` 헬퍼 함수로 분리.
+- `signal: options.signal as any` 부분에서 `as any`를 제거하고 타입 안정성 확보.
+
+**7. 프론트엔드 Fetch 기반 SSE 토큰 누락 및 개행 파싱 오류 해결**
+
+**문제점:**
+- 네이티브 `fetch` API를 사용할 때 Axios 인터셉터를 타지 않아 `Authorization` 토큰이 누락됨.
+- `buffer.split("\n\n")` 방식은 운영 환경(Nginx 등)의 `\r\n` 개행 방식과 충돌할 여지가 있음.
+
+**해결 방법:**
+- Zustand의 `useAuthStore`에서 `accessToken`을 가져와 `fetch` 요청 헤더에 수동으로 `Bearer` 토큰 주입.
+- SSE 이벤트를 `buffer.split(/\r?\n/)` 정규식을 활용해 라인 단위로 안전하게 파싱하도록 개선.
+
 #### 📌 다음 할 일
 
-- [ ] 스트리밍 엔드포인트에 `ensureAuth` 미들웨어 추가 검토
+- [x] 스트리밍 엔드포인트에 `ensureAuth` 미들웨어 추가 검토
   - 현재 `/write` 엔드포인트와 일관성 유지
   - 인증 필수인지 정책 결정 필요
 - [ ] 네트워크 끊김 복구 전략 구현 (추후)
   - SSE 자동 재연결 (브라우저 기본 제공)
   - 에러 상태에서 사용자 경험 개선
-- [ ] 클라이언트 연결 끊김 시 OpenAI 스트림 abort (추후)
+- [x] 클라이언트 연결 끊김 시 OpenAI 스트림 abort (추후)
   - `req.on('close', ...)` 패턴
   - 리소스 누수 방지
 - [ ] **Step 4 진행**: 입력 검증 추가
@@ -1105,7 +1146,7 @@ onAiStart: (paragraph) => {
 
 - [RESOLVED] CORS 와일드카드 + credentials 충돌 ✅
 - [RESOLVED] onChunk에서 ID를 찾지 못하는 문제 ✅
-- [TODO] 스트리밍 엔드포인트 인증 정책 결정 필요
+- [RESOLVED] 스트리밍 엔드포인트 인증 정책 결정 필요 ✅ (ensureAuth, checkProjectOwnership 적용 완료)
 
 #### 📊 진행률
 
