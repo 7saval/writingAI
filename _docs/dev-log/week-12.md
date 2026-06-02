@@ -1071,19 +1071,23 @@ onAiStart: (paragraph) => {
 **4. BOLA (Broken Object Level Authorization) 취약점 해결**
 
 **문제점:**
+
 - `/write` 및 `/write/stream` 엔드포인트에 인증/인가 미들웨어가 누락되어 로그인하지 않은 사용자나 타인이 임의로 글을 생성할 수 있는 심각한 보안 취약점 존재.
 
 **해결 방법:**
+
 - `writingRoutes.ts`에 `ensureAuth` 및 `checkProjectOwnership` 미들웨어 추가 적용.
 - (해결 과정에서 기존 계획된 `스트리밍 엔드포인트에 ensureAuth 미들웨어 추가 검토` 항목 완료 처리됨)
 
 **5. SSE 스트리밍 도중 클라이언트 연결 해제 시 리소스 누수 방지**
 
 **문제점:**
+
 - 스트리밍 중 브라우저 탭을 닫거나 요청을 취소하면 서버는 계속해서 OpenAI API를 호출하며 토큰을 낭비함.
 - 예외 발생 시 DB에 내용이 비어있는(`""`) 단락이 그대로 남는 문제 발생.
 
 **해결 방법:**
+
 - `writingController.ts`에 `req.on('close')` 이벤트를 리스닝하여 연결 종료 감지.
 - `AbortController`를 도입해 `client.chat.completions.create`에 `signal`을 전달하여 OpenAI API 스트림 즉시 취소.
 - 스트림 취소 또는 에러 발생 시 `fullContent`가 비어있다면 해당 임시 단락(`aiParagraph`)을 DB에서 `remove` 처리하여 정합성 유지.
@@ -1091,10 +1095,12 @@ onAiStart: (paragraph) => {
 **6. 영문 장르명의 프롬프트 맵핑 누락 및 타입 안정성 개선**
 
 **문제점:**
+
 - DB에 저장된 영문 장르(`Fantasy`, `Romance` 등)가 한글 키를 사용하는 `genrePrompts`와 매칭되지 않아 프롬프트에 `undefined`가 주입되는 버그.
 - `aiService.ts`에서 불필요한 `as any` 타입 캐스팅 및 코드 중복 발생.
 
 **해결 방법:**
+
 - `aiService.ts` 내에 `genreMap`을 추가하여 영문 장르를 한글 키로 안전하게 변환.
 - `generateNextParagraph`와 `generateNextParagraphStream`의 중복 로직을 `prepareFinalMessages` 헬퍼 함수로 분리.
 - `signal: options.signal as any` 부분에서 `as any`를 제거하고 타입 안정성 확보.
@@ -1102,10 +1108,12 @@ onAiStart: (paragraph) => {
 **7. 프론트엔드 Fetch 기반 SSE 토큰 누락 및 개행 파싱 오류 해결**
 
 **문제점:**
+
 - 네이티브 `fetch` API를 사용할 때 Axios 인터셉터를 타지 않아 `Authorization` 토큰이 누락됨.
 - `buffer.split("\n\n")` 방식은 운영 환경(Nginx 등)의 `\r\n` 개행 방식과 충돌할 여지가 있음.
 
 **해결 방법:**
+
 - Zustand의 `useAuthStore`에서 `accessToken`을 가져와 `fetch` 요청 헤더에 수동으로 `Bearer` 토큰 주입.
 - SSE 이벤트를 `buffer.split(/\r?\n/)` 정규식을 활용해 라인 단위로 안전하게 파싱하도록 개선.
 
@@ -1160,5 +1168,181 @@ onAiStart: (paragraph) => {
 
 Week 12: ██████████ 100% (Day 3/7)  
 전체: ███████████ 85%+ (Week 12/14)
+
+---
+
+### 📅 2026-06-02 (Day 79)
+
+#### 🎯 오늘의 목표
+
+- [x] 백엔드 Sentry Node.js SDK 설치 및 초기화
+- [x] 프론트엔드 Sentry React SDK 설치 및 초기화
+- [x] 에러 핸들러에 Sentry 에러 캡처 연동
+- [x] Vite 빌드에 소스맵 업로드 플러그인 연결
+
+#### ✅ 완료한 작업
+
+**백엔드 Sentry 설정**
+
+- ✅ `@sentry/node ^10.55.0` 패키지 설치 (`backend/package.json`)
+- ✅ `backend/src/index.ts` 최상단에 `Sentry.init()` 호출
+  - `dsn: process.env.SENTRY_DSN` 환경변수 참조
+  - `environment: process.env.NODE_ENV || "development"` 설정
+  - `Sentry.setupExpressErrorHandler(app)` 추가 (글로벌 에러 핸들러 앞에 위치)
+- ✅ `backend/src/middleware/errorHandler.ts`에 `Sentry.captureException(err)` 추가
+  - 기존 `console.error(err)` 유지, Sentry로도 동시에 전송
+- ✅ `dotenv/config` import를 조건 없이 항상 실행하도록 변경
+
+**프론트엔드 Sentry 설정**
+
+- ✅ `@sentry/react ^10.55.0` 설치 (런타임 의존성)
+- ✅ `@sentry/vite-plugin ^5.3.0` 설치 (devDependency)
+- ✅ `frontend/src/main.tsx`에 `Sentry.init()` 추가 (ReactDOM.createRoot() 호출 전)
+  - `dsn: import.meta.env.VITE_SENTRY_DSN`
+  - `integrations: [Sentry.browserTracingIntegration()]`
+  - `tracesSampleRate: 0` (성능 추적 비활성화, 에러만 수집)
+- ✅ `frontend/src/App.tsx`에 `<Sentry.ErrorBoundary fallback={<ErrorPage />}>` 추가
+  - 전체 앱을 에러 바운더리로 감싸서 React 렌더링 에러도 Sentry에 보고
+  - `Error` → `ErrorPage`로 컴포넌트 import alias 수정 (내장 `Error` 객체와 이름 충돌 방지)
+- ✅ `frontend/vite.config.ts`에 `sentryVitePlugin` 추가
+  - `org`, `project`, `authToken: process.env.SENTRY_AUTH_TOKEN` 설정
+  - `build.sourcemap: true` 활성화 (프로덕션 빌드에서 정확한 스택트레이스 제공)
+
+#### 💡 배운 것
+
+**Sentry 초기화 위치의 중요성**
+
+```typescript
+// ❌ 잘못된 순서: app 세팅 후 Sentry 초기화
+const app = express();
+import * as Sentry from "@sentry/node";
+Sentry.init({ dsn: "..." });
+
+// ✅ 올바른 순서: 파일 최상단에서 먼저 초기화
+import * as Sentry from "@sentry/node";
+Sentry.init({ dsn: "..." }); // 다른 어떤 import보다 먼저
+import express from "express";
+```
+
+- Sentry는 Node.js 모듈 로딩 과정에 후킹(hooking)하여 instrumentation을 적용
+- 다른 모듈이 먼저 로드되면 Sentry가 해당 모듈의 자동 계측을 놓칠 수 있음
+- 프론트엔드도 마찬가지로 `createRoot()` 전에 `Sentry.init()` 호출 필수
+
+**`Sentry.setupExpressErrorHandler(app)` vs `errorHandler` 미들웨어**
+
+```typescript
+// Express 에러 미들웨어 순서
+app.use("/api", router);
+Sentry.setupExpressErrorHandler(app); // ← Sentry가 에러를 먼저 캡처
+app.use(errorHandler); // ← 그 후 커스텀 에러 핸들러로 응답 전송
+```
+
+- `setupExpressErrorHandler`는 Express의 에러 핸들링 미들웨어로 등록됨
+- 라우터 다음, 커스텀 에러 핸들러 이전에 위치해야 정상 동작
+- 이 메서드 없이 `errorHandler`에서 `Sentry.captureException()`만 호출해도 동작하지만, `setupExpressErrorHandler`를 사용하면 unhandledRejection, uncaughtException도 자동 처리
+
+**`tracesSampleRate: 0` 설정 이유**
+
+- `tracesSampleRate`은 성능 모니터링(트랜잭션 추적) 샘플링 비율
+- `1`로 설정하면 모든 요청이 성능 트랜잭션으로 기록 → Sentry 요금 빠르게 소진
+- 무료 플랜에서는 에러 모니터링이 주목적이므로 `0`으로 설정해 에러만 수집
+
+**소스맵과 에러 추적**
+
+```
+프로덕션 빌드 (번들링 전)          번들링 후 (브라우저에서 실행)
+src/components/Editor.tsx:45  →  dist/assets/index-Abc123.js:1
+  throw new Error("...")           throw new Error("...")
+```
+
+- 브라우저에서 발생한 에러 스택트레이스는 압축된 번들 파일을 가리킴
+- `sourcemap: true` + `sentryVitePlugin`으로 빌드 시 소스맵을 Sentry에 업로드
+- 이후 Sentry 대시보드에서 원본 파일명, 라인 번호로 정확한 에러 위치 확인 가능
+
+**ErrorBoundary 사용 시점**
+
+```tsx
+// React 렌더링 에러는 일반 try-catch로 잡을 수 없음
+// ErrorBoundary로만 잡을 수 있다
+<Sentry.ErrorBoundary fallback={<ErrorPage />}>
+  <RouterProvider router={router} />
+</Sentry.ErrorBoundary>
+```
+
+- 네트워크 에러나 이벤트 핸들러 에러는 ErrorBoundary가 잡지 않음
+- 렌더링 중 발생하는 에러, `useEffect` 내 throw 등만 잡음
+- `fallback` prop에 에러 발생 시 보여줄 컴포넌트를 지정
+
+#### 🔧 해결한 문제
+
+**`Error` 컴포넌트 이름 충돌**
+
+**문제점:**
+
+- `import Error from "@/components/common/Error"` 이름이 JS 내장 `Error` 객체와 동일
+- TypeScript 및 ESLint에서 잠재적 혼란 발생 가능
+
+**해결 방법:**
+
+```typescript
+// ❌ Before
+import Error from "@/components/common/Error";
+errorElement: <Error />,
+fallback={<Error />}
+
+// ✅ After
+import ErrorPage from "@/components/common/Error";
+errorElement: <ErrorPage />,
+fallback={<ErrorPage />}
+```
+
+**`dotenv/config` 조건부 import 제거**
+
+**문제점:**
+
+```typescript
+// ❌ Before: 프로덕션에서 .env 파일 로드 안 됨
+if (process.env.NODE_ENV !== "production") {
+  import("dotenv/config");
+}
+```
+
+- `import()`는 동적 import → 비동기 실행이라 SENTRY_DSN이 `Sentry.init()` 시점에 아직 로드 안 됨
+- 실제 배포 환경에서는 환경변수를 시스템에서 주입하므로 dotenv 불필요하지만, 개발 환경 일관성을 위해 항상 로드하는 게 안전
+
+**해결 방법:**
+
+```typescript
+// ✅ After: 최상단에서 동기적으로 항상 로드
+import "dotenv/config";
+import * as Sentry from "@sentry/node";
+Sentry.init({ dsn: process.env.SENTRY_DSN, ... });
+```
+
+#### 📌 내일 할 일
+
+- [x] `SENTRY_DSN`, `VITE_SENTRY_DSN` 환경변수를 `.env` 파일에 추가
+- [x] Sentry 대시보드에서 에러 수신 확인 (테스트 에러 발생시켜보기)
+- [x] `vite.config.ts`의 `org`, `project` 값을 실제 Sentry 프로젝트 정보로 업데이트
+- [ ] **Step 4 진행**: 입력 검증 추가 (Zod 스키마)
+- [ ] **Step 5 진행**: 에러 처리 개선
+
+#### 🚨 이슈/질문
+
+- [TODO] `vite.config.ts`의 `org: "your-org"`, `project: "your-project"` 플레이스홀더 → 실제 Sentry 프로젝트 슬러그로 교체 필요
+- [TODO] `SENTRY_AUTH_TOKEN` 환경변수 발급 및 `.env`에 추가 (소스맵 업로드 시 필요)
+- [질문] 프로덕션 배포 시 소스맵 파일을 번들에 포함시키지 않고 Sentry에만 올리려면 `sourcemap: "hidden"` 옵션 사용 검토 필요
+
+#### 📊 진행률
+
+Sentry 모니터링 셋업: ████████░░ 80% (SDK 초기화 완료, DSN 연결 및 검증 필요)
+
+- ✅ 백엔드: @sentry/node 설치 + init + 에러 핸들러 연동
+- ✅ 프론트엔드: @sentry/react 설치 + init + ErrorBoundary 추가
+- ✅ 빌드: @sentry/vite-plugin + sourcemap 설정
+- ⬜ 환경변수 설정 및 실제 Sentry 프로젝트 연결 확인
+
+Week 12: ████████████ 100%+ (Day 4/7)  
+전체: ████████████ 87%+ (Week 12/14)
 
 ---
