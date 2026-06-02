@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/react";
 import {
   RouterProvider,
   createBrowserRouter,
@@ -6,7 +7,7 @@ import {
 import "@/App.css";
 import { routeList } from "@/utils/routeList";
 import Layout from "@/components/layout/Layout";
-import Error from "@/components/common/Error";
+import ErrorPage from "@/components/common/Error";
 import { useAuthUserQuery as useAuthQuery } from "@/hooks/useAuth";
 import { Toaster } from "@/components/ui/sonner";
 import ShowAlert from "@/components/common/alert/ShowAlert";
@@ -18,7 +19,7 @@ const routerConfig = routeList.map((item) => {
     // export route는 chrome UI 없이 인쇄 전용 문서만 보여줘야 해서 Layout을 거치지 않는다.
     element:
       item.useLayout === false ? item.element : <Layout>{item.element}</Layout>,
-    errorElement: <Error />,
+    errorElement: <ErrorPage />,
   };
 });
 
@@ -34,10 +35,12 @@ function App() {
 
   return (
     <>
-      <RouterProvider router={router} />
-      <ShowAlert />
-      <ShowConfirm />
-      <Toaster />
+      <Sentry.ErrorBoundary fallback={<ErrorPage />}>
+        <RouterProvider router={router} />
+        <ShowAlert />
+        <ShowConfirm />
+        <Toaster />
+      </Sentry.ErrorBoundary>
     </>
   );
 }

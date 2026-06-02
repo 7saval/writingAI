@@ -1,7 +1,16 @@
+import * as Sentry from "@sentry/node";
 import { NextFunction, Request, Response } from "express";
 import { StatusCodes } from "http-status-codes";
 
-export function errorHandler(err: unknown, _req: Request, res: Response, _next: NextFunction) {
-    console.error(err);
-    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ error: (err as Error).message || "Server Error" });
+export function errorHandler(
+  err: unknown,
+  _req: Request,
+  res: Response,
+  _next: NextFunction,
+) {
+  Sentry.captureException(err);
+  console.error(err);
+  res
+    .status(StatusCodes.INTERNAL_SERVER_ERROR)
+    .json({ error: (err as Error).message || "Server Error" });
 }
