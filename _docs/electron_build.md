@@ -67,11 +67,11 @@
 
 할 일:
 
-- [ ] `frontend/dist` 생성 결과 확인
-- [ ] `dist-electron/main.js`, `dist-electron/preload.js` 생성 결과 확인
-- [ ] `electron:build` 실행 시 프론트/메인 빌드 순서가 안정적인지 확인
-- [ ] Electron이 프로덕션 환경에서 `file://` 경로로 프론트엔드 화면을 정상 로드하는지 확인
-- [ ] preload 경로가 빌드 후에도 올바른지 확인
+- [x] `frontend/dist` 생성 결과 확인
+- [x] `dist-electron/main.js`, `dist-electron/preload.js` 생성 결과 확인
+- [x] `electron:build` 실행 시 프론트/메인 빌드 순서가 안정적인지 확인
+- [x] Electron이 프로덕션 환경에서 `file://` 경로로 프론트엔드 화면을 정상 로드하는지 확인
+- [x] preload 경로가 빌드 후에도 올바른지 확인
 
 주의:
 
@@ -86,13 +86,13 @@
 
 할 일:
 
-- [ ] 루트 `package.json`에 `build` 설정 추가
-- [ ] `appId` 정의
-- [ ] `productName` 정의
-- [ ] `directories.output` 정의
-- [ ] `files` 포함 범위 정의
-- [ ] Windows 타깃 정의
-- [ ] 아이콘 경로 정의
+- [x] 루트 `package.json`에 `build` 설정 추가
+- [x] `appId` 정의
+- [x] `productName` 정의
+- [x] `directories.output` 정의
+- [x] `files` 포함 범위 정의
+- [x] Windows 타깃 정의
+- [x] 아이콘 경로 정의
 
 권장 기본 설정 항목:
 
@@ -127,11 +127,11 @@
 
 할 일:
 
-- [ ] 프론트엔드 번들 파일 포함 여부 확인
-- [ ] Electron 메인/프리로드 파일 포함 여부 확인
-- [ ] PDF export용 폰트 파일 포함 여부 확인
-- [ ] 앱 아이콘 포함 여부 확인
-- [ ] native module 관련 파일 포함 여부 확인
+- [x] 프론트엔드 번들 파일 포함 여부 확인
+- [x] Electron 메인/프리로드 파일 포함 여부 확인
+- [x] PDF export용 폰트 파일 포함 여부 확인
+- [x] 앱 아이콘 포함 여부 확인
+- [x] native module 관련 파일 포함 여부 확인
 
 특히 중요:
 
@@ -214,10 +214,10 @@
 
 할 일:
 
-- [ ] `ELECTRON_START_URL`이 배포 빌드에서는 사용되지 않도록 점검
-- [ ] 프론트엔드 `.env` 값 중 배포 시 필요한 값과 불필요한 값을 구분
-- [ ] API 서버 URL이 고정값인지, 환경별 분리가 필요한지 판단
-- [ ] Google OAuth 등 외부 연동 키가 배포 앱에서 어떻게 동작할지 점검
+- [x] `ELECTRON_START_URL`이 배포 빌드에서는 사용되지 않도록 점검
+- [x] 프론트엔드 `.env` 값 중 배포 시 필요한 값과 불필요한 값을 구분
+- [x] API 서버 URL이 고정값인지, 환경별 분리가 필요한지 판단
+- [x] Google OAuth 등 외부 연동 키가 배포 앱에서 어떻게 동작할지 점검
 
 질문이 필요한 항목:
 
@@ -232,7 +232,7 @@
 
 필수 검증 항목:
 
-- [ ] 앱 실행
+- [x] 앱 실행
 - [ ] 로그인
 - [ ] 프로젝트 목록 조회
 - [ ] 프로젝트 진입
@@ -265,9 +265,9 @@
 
 정리할 것:
 
-- [ ] 최종 산출물 폴더 규칙 확정
-- [ ] 버전명 표기 방식 확정
-- [ ] 릴리스 파일명 규칙 확정
+- [x] 최종 산출물 폴더 규칙 확정 (`release/`)
+- [x] 버전명 표기 방식 확정 (`package.json` version 기준)
+- [x] 릴리스 파일명 규칙 확정 (`Companion Writer Setup x.x.x.exe`)
 
 예시:
 
@@ -379,10 +379,10 @@ Word/PDF export는 일반 화면보다 정적 파일 의존성이 더 강하다.
 
 문서 기준으로 바로 이어서 할 작업은 아래다.
 
-- [ ] `package.json`에 `electron-builder` 배포 설정 초안 추가
-- [ ] 아이콘 파일 준비
-- [ ] `release` 출력 폴더 기준 첫 Windows 빌드 생성
-- [ ] 빌드된 설치 파일 수동 테스트
+- [x] `package.json`에 `electron-builder` 배포 설정 초안 추가
+- [x] 아이콘 파일 준비
+- [x] `release` 출력 폴더 기준 첫 Windows 빌드 생성
+- [x] 빌드된 설치 파일 수동 테스트
 
 ---
 
@@ -442,12 +442,12 @@ Electron app
 
 구현할 것:
 
-- [ ] `createDesktopOAuthSession()`
-- [ ] `getDesktopOAuthSession(sessionId)`
-- [ ] `getDesktopOAuthSessionByState(state)`
-- [ ] `completeDesktopOAuthSession(state, result)`
-- [ ] `failDesktopOAuthSession(state, message)`
-- [ ] 5분 만료 처리
+- [x] `createDesktopOAuthSession()`
+- [x] `getDesktopOAuthSession(sessionId)`
+- [x] `getDesktopOAuthSessionByState(state)`
+- [x] `completeDesktopOAuthSession(state, result)`
+- [x] `failDesktopOAuthSession(state, message)`
+- [x] 5분 만료 처리
 
 데이터 형태:
 
@@ -616,10 +616,10 @@ authRouter.get(
 
 확인:
 
-- [ ] Render 배포 후 `POST /api/auth/google/desktop/session` 호출 성공
-- [ ] 응답에 `authUrl` 포함
-- [ ] 브라우저에서 `authUrl` 접속 시 Google 로그인 화면 표시
-- [ ] Google 로그인 후 callback endpoint 호출
+- [x] Render 배포 후 `POST /api/auth/google/desktop/session` 호출 성공
+- [x] 응답에 `authUrl` 포함
+- [x] 브라우저에서 `authUrl` 접속 시 Google 로그인 화면 표시
+- [x] Google 로그인 후 callback endpoint 호출
 
 ### Step 4. Electron External Browser API
 
@@ -636,8 +636,8 @@ authRouter.get(
 
 `electron/main.ts`:
 
-- [ ] `shell` import 추가
-- [ ] IPC handler 추가
+- [x] `shell` import 추가
+- [x] IPC handler 추가
 
 ```ts
 ipcMain.handle("open-external-url", async (_event, url: string) => {
@@ -660,8 +660,8 @@ openExternalUrl: (url: string) => Promise<void>;
 
 확인:
 
-- [ ] Electron 앱에서 `window.electron.openExternalUrl(url)` 호출 가능
-- [ ] 기본 브라우저가 열린다
+- [x] Electron 앱에서 `window.electron.openExternalUrl(url)` 호출 가능
+- [x] 기본 브라우저가 열린다
 
 ### Step 5. Frontend API
 
@@ -691,8 +691,8 @@ export const getDesktopGoogleSessionStatus = async (sessionId: string) => {
 
 확인:
 
-- [ ] Electron build에서 `apiClient`가 Render API를 바라봄
-- [ ] `createDesktopGoogleSession()` 응답에 `sessionId`, `authUrl` 포함
+- [x] Electron build에서 `apiClient`가 Render API를 바라봄
+- [x] `createDesktopGoogleSession()` 응답에 `sessionId`, `authUrl` 포함
 
 ### Step 6. Frontend Electron Google Login Hook
 
@@ -768,9 +768,9 @@ const isElectron = Boolean(window.electron);
 
 확인:
 
-- [ ] 웹/Vercel에서는 기존 Google 버튼 표시
-- [ ] Electron 앱에서는 기존 Google 팝업 버튼 미표시
-- [ ] Electron 앱에서는 새 버튼 클릭 시 기본 브라우저 열림
+- [x] 웹/Vercel에서는 기존 Google 버튼 표시
+- [x] Electron 앱에서는 기존 Google 팝업 버튼 미표시
+- [x] Electron 앱에서는 새 버튼 클릭 시 기본 브라우저 열림
 
 ### Step 8. Render Deploy And Google Console
 
@@ -780,7 +780,7 @@ const isElectron = Boolean(window.electron);
 
 Google Cloud Console:
 
-- [ ] OAuth client redirect URI 추가
+- [x] OAuth client redirect URI 추가
 
 ```text
 https://writingai-dcb3.onrender.com/api/auth/google/desktop/callback
@@ -788,10 +788,10 @@ https://writingai-dcb3.onrender.com/api/auth/google/desktop/callback
 
 Render:
 
-- [ ] 백엔드 최신 코드 배포
-- [ ] `GOOGLE_CLIENT_ID`가 Google Cloud Console client id와 일치
-- [ ] `NODE_ENV=production`
-- [ ] DB 연결 정상
+- [x] 백엔드 최신 코드 배포
+- [x] `GOOGLE_CLIENT_ID`가 Google Cloud Console client id와 일치
+- [x] `NODE_ENV=production`
+- [x] DB 연결 정상
 
 ### Step 9. Electron Rebuild
 
