@@ -309,19 +309,19 @@
 
 정리할 것:
 
-- [ ] 배포 업로드 위치 결정
-- [ ] 릴리스 노트 템플릿 작성
-- [ ] 버전 이력 관리 방식 결정
+- [x] 배포 업로드 위치 결정 (GitHub Releases)
+- [x] 릴리스 노트 템플릿 작성 (버전 번호 기본값)
+- [x] 버전 이력 관리 방식 결정 (`npm version` + git tag)
 
 ### 10단계. 후속 확장 계획
 
 1차 배포 후 고려할 항목:
 
-- [ ] 자동 업데이트(`electron-updater`)
+- [x] 자동 업데이트(`electron-updater`)
 - [ ] macOS 배포
 - [ ] 코드 서명 자동화
 - [ ] CI/CD 기반 자동 빌드
-- [ ] 릴리스 태그 기반 자동 업로드
+- [x] 릴리스 태그 기반 자동 업로드 (`npm run electron:release`)
 
 ## 실제 작업 순서 제안
 
@@ -1061,8 +1061,8 @@ npm run electron:build
 
 할 일:
 
-- [ ] `npm version patch` 테스트 (버전 증가 + git tag 확인)
-- [ ] 새 버전으로 빌드 후 파일명 확인
+- [x] `npm version patch` 테스트 (버전 증가 + git tag 확인)
+- [x] 새 버전으로 빌드 후 파일명 확인
 
 ### Step 8. 릴리스 워크플로우 (수동)
 
@@ -1096,7 +1096,7 @@ git push origin HEAD --tags
 
 - [x] gh CLI 설치 (`winget install --id GitHub.cli`)
 - [x] `gh auth login`으로 인증
-- [ ] 위 릴리스 워크플로우 1회 테스트
+- [x] 위 릴리스 워크플로우 1회 테스트
 
 ### Step 9. 헤더 다운로드 URL 버전 관리
 
@@ -1131,8 +1131,8 @@ https://github.com/7saval/writingAI/releases/latest/download/Companion.Writer.Se
 
 할 일:
 
-- [ ] `artifactName` 설정 추가
-- [ ] 헤더 URL을 `latest/download` 방식으로 변경
+- [x] `artifactName` 설정 추가 (`Companion.Writer.Setup.${version}.${ext}`)
+- [x] 헤더 URL 자동 업데이트 방식으로 변경 (`scripts/release.js`가 릴리스마다 자동 갱신)
 - [ ] 테스트: 새 버전 릴리스 후 URL이 새 파일을 가리키는지 확인
 
 ### 완료 기준
@@ -1144,3 +1144,62 @@ https://github.com/7saval/writingAI/releases/latest/download/Companion.Writer.Se
 - "새 버전이 있습니다" 배너 표시
 - "재시작" 클릭 시 새 버전으로 자동 설치
 - 헤더 다운로드 버튼이 항상 최신 버전을 받아옴
+
+---
+
+## 자동 릴리스 워크플로우
+
+### 명령어 한 줄 요약
+
+```powershell
+npm run electron:release
+```
+
+이 명령 하나로 버전 증가 → 빌드 → GitHub 릴리스 → 헤더 URL 업데이트 → 푸시까지 전부 자동 처리된다.
+
+### 내부 동작 순서
+
+```text
+npm version patch
+→ package.json version 증가 (0.1.1 → 0.1.2)
+→ git commit + git tag v0.1.2 자동 생성
+
+npm run electron:build
+→ frontend/dist 빌드
+→ dist-electron 빌드
+→ release/Companion.Writer.Setup.0.1.2.exe 생성
+→ release/latest.yml 생성 (version: 0.1.2)
+
+node scripts/release.js
+→ Header.tsx 다운로드 URL을 v0.1.2로 자동 교체
+→ git commit "chore: update download URL to v0.1.2"
+→ gh release create v0.1.2 (exe + latest.yml 업로드)
+→ git push origin HEAD --tags
+```
+
+### 전제 조건
+
+- 실행 전 변경사항이 모두 커밋된 상태여야 한다 (`npm version patch`가 클린 워킹 트리 요구)
+- `C:\Program Files\GitHub CLI\gh.exe`가 설치되어 있어야 한다
+- `gh auth login`으로 GitHub 인증이 완료되어 있어야 한다
+
+### 관련 파일
+
+| 파일 | 역할 |
+| --- | --- |
+| [`package.json`](../package.json) | `electron:release` 스크립트, `artifactName`, `publish` 설정 |
+| [`scripts/release.js`](../scripts/release.js) | Header.tsx URL 업데이트 + gh release create + git push |
+| [`frontend/src/components/common/Header.tsx`](../frontend/src/components/common/Header.tsx) | 다운로드 버튼 URL (릴리스마다 자동 갱신) |
+| [`frontend/src/components/common/UpdateBanner.tsx`](../frontend/src/components/common/UpdateBanner.tsx) | 앱 내 업데이트 알림 배너 |
+| [`electron/main.ts`](../electron/main.ts) | `autoUpdater` 업데이트 감지 + IPC |
+| [`electron/preload.ts`](../electron/preload.ts) | `onUpdateDownloaded`, `restartToUpdate` IPC 노출 |
+
+### 버전 전략
+
+| 케이스 | 명령어 | 예시 |
+| --- | --- | --- |
+| 버그 수정, 소규모 변경 | `npm run electron:release` (기본 patch) | 0.1.1 → 0.1.2 |
+| 기능 추가 | `npm version minor` 후 수동 빌드/릴리스 | 0.1.x → 0.2.0 |
+| 하위 호환 깨지는 변경 | `npm version major` 후 수동 빌드/릴리스 | 0.x.x → 1.0.0 |
+
+`minor`, `major` 버전업은 릴리스 노트를 직접 작성하는 게 낫기 때문에 수동으로 처리하는 것을 권장한다.
