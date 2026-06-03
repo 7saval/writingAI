@@ -58,7 +58,7 @@ function Header() {
             {!window.electron && (
               <Button asChild variant="default" size="sm" className="gap-2">
                 <a
-                  href="https://github.com/7saval/writingAI/releases/download/v0.1.1/Companion.Writer.Setup.0.1.1.exe"
+                  href="https://github.com/7saval/writingAI/releases/download/v0.1.2/Companion.Writer.Setup.0.1.2.exe"
                   download
                 >
                   <Monitor className="h-4 w-4" />앱 다운로드
