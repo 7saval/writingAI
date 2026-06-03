@@ -885,3 +885,262 @@ Google 로그인은 됐는데 앱 재실행 후 로그아웃됨:
 
 - `shell.openExternal()`이 아니라 Electron 내부 팝업이 열리고 있는지 확인
 - Electron에서는 반드시 기본 브라우저를 열어야 함
+
+---
+
+## Auto Update Plan
+
+### Goal
+
+앱이 실행될 때 GitHub Releases에서 새 버전을 자동으로 감지하고, 백그라운드에서 다운로드 후 사용자에게 재시작을 유도한다.
+
+버전 번호는 `package.json`의 `version` 필드를 단일 진실의 원천으로 삼고, npm version 명령으로 자동 관리한다.
+
+흐름:
+
+```text
+npm version patch/minor/major
+→ package.json version 자동 증가 + git tag 생성
+→ npm run electron:build
+→ release/ 폴더에 새 .exe 생성
+→ gh release create로 GitHub Releases에 업로드
+→ 기존 앱이 실행되면 latest.yml을 polling해서 업데이트 감지
+→ 백그라운드 다운로드
+→ 사용자에게 "새 버전이 있습니다. 재시작할까요?" 알림
+→ 앱 재시작 시 자동 설치
+```
+
+### Step 1. electron-updater 설치
+
+```powershell
+npm install electron-updater
+npm install -D @types/electron-updater
+```
+
+### Step 2. package.json publish 설정
+
+`electron-builder`가 어디에 업데이트 피드를 게시할지 알아야 한다.
+
+`package.json`의 `build` 섹션에 추가:
+
+```json
+{
+  "build": {
+    "publish": {
+      "provider": "github",
+      "owner": "7saval",
+      "repo": "writingAI"
+    }
+  }
+}
+```
+
+이 설정이 있어야 `electron-builder`가 빌드 시 `latest.yml`을 올바른 형식으로 생성한다.
+
+할 일:
+
+- [x] `package.json` `build` 섹션에 `publish` 설정 추가
+
+### Step 3. main.ts 업데이트 로직
+
+수정 파일:
+
+- [`electron/main.ts`](../electron/main.ts)
+
+추가할 것:
+
+```ts
+import { autoUpdater } from "electron-updater";
+
+// 업데이트 로그 활성화 (개발 중 디버깅용)
+autoUpdater.logger = require("electron-log");
+
+// 앱 준비 후 업데이트 체크
+app.whenReady().then(() => {
+  createWindow();
+  autoUpdater.checkForUpdatesAndNotify();
+});
+
+// 업데이트 다운로드 완료 → 렌더러에 알림
+autoUpdater.on("update-downloaded", () => {
+  mainWindow?.webContents.send("update-downloaded");
+});
+```
+
+렌더러에서 재시작 요청을 받을 IPC 핸들러도 추가:
+
+```ts
+ipcMain.handle("restart-and-install", () => {
+  autoUpdater.quitAndInstall();
+});
+```
+
+할 일:
+
+- [x] `electron-updater` import 추가
+- [x] `autoUpdater.checkForUpdatesAndNotify()` 호출 추가
+- [x] `update-downloaded` 이벤트 → 렌더러 IPC 전송
+- [x] `restart-and-install` IPC 핸들러 추가
+
+### Step 4. preload.ts IPC 노출
+
+수정 파일:
+
+- [`electron/preload.ts`](../electron/preload.ts)
+
+추가할 것:
+
+```ts
+onUpdateDownloaded: (callback: () => void) =>
+  ipcRenderer.on("update-downloaded", callback),
+restartToUpdate: () => ipcRenderer.invoke("restart-to-update"),
+```
+
+할 일:
+
+- [x] `onUpdateDownloaded` 노출
+- [x] `restartToUpdate` 노출
+
+### Step 5. electron.d.ts 타입 추가
+
+수정 파일:
+
+- [`frontend/src/types/electron.d.ts`](../frontend/src/types/electron.d.ts)
+
+추가할 것:
+
+```ts
+onUpdateDownloaded: (callback: () => void) => void;
+restartToUpdate: () => Promise<void>;
+```
+
+할 일:
+
+- [x] 타입 선언 추가
+
+### Step 6. 프론트엔드 업데이트 알림 UI
+
+수정 파일 (예시):
+
+- `frontend/src/components/common/UpdateBanner.tsx` (신규)
+
+동작:
+
+- `window.electron.onUpdateDownloaded()` 구독
+- 업데이트 감지 시 하단 또는 상단에 배너 표시
+- "지금 재시작" 버튼 클릭 → `window.electron.restartToUpdate()` 호출
+- Electron 앱 안에서만 렌더링 (`window.electron` 조건부)
+
+할 일:
+
+- [x] `UpdateBanner` 컴포넌트 작성
+- [x] `App.tsx` 또는 레이아웃 컴포넌트에 포함
+
+### Step 7. 버전 번호 자동화
+
+`npm version` 명령이 `package.json`의 `version`을 올리고 git tag를 자동 생성한다.
+
+```powershell
+# 패치 버전 올리기 (0.1.0 → 0.1.1)
+npm version patch
+
+# 마이너 버전 올리기 (0.1.0 → 0.2.0)
+npm version minor
+
+# 메이저 버전 올리기 (0.1.0 → 1.0.0)
+npm version major
+```
+
+버전 올린 뒤 빌드:
+
+```powershell
+npm run electron:build
+```
+
+`electron-builder`가 `package.json`의 `version`을 읽어 `.exe` 파일명과 `latest.yml`에 자동 반영한다.
+
+할 일:
+
+- [ ] `npm version patch` 테스트 (버전 증가 + git tag 확인)
+- [ ] 새 버전으로 빌드 후 파일명 확인
+
+### Step 8. 릴리스 워크플로우 (수동)
+
+gh CLI가 설치된 경우 아래 순서로 릴리스한다.
+
+```powershell
+# 1. 버전 올리기
+npm version patch
+
+# 2. 빌드
+npm run electron:build
+
+# 3. GitHub Release 생성 + .exe + latest.yml 업로드
+$version = node -p "require('./package.json').version"
+& "C:\Program Files\GitHub CLI\gh.exe" release create "v$version" "release\Companion.Writer.Setup.exe" "release\latest.yml" `
+  --repo 7saval/writingAI `
+  --title "v$version" `
+  --notes "업데이트 내용을 여기에 작성"
+
+# 4. git push (현재 브랜치 + 태그 포함)
+git push origin HEAD --tags
+```
+
+이 순서로 올리면:
+
+- GitHub Release에 새 `.exe`가 올라감
+- `latest.yml`도 같이 올라가서 기존 앱이 업데이트를 감지함
+- 헤더 다운로드 버튼 URL도 새 버전으로 갱신 필요
+
+할 일:
+
+- [x] gh CLI 설치 (`winget install --id GitHub.cli`)
+- [x] `gh auth login`으로 인증
+- [ ] 위 릴리스 워크플로우 1회 테스트
+
+### Step 9. 헤더 다운로드 URL 버전 관리
+
+현재 헤더에 버전이 하드코딩되어 있다.
+
+```tsx
+href =
+  "https://github.com/7saval/writingAI/releases/download/v0.1.0/Companion.Writer.Setup.0.1.0.exe";
+```
+
+릴리스할 때마다 URL을 수동으로 올리는 대신, GitHub의 `latest` redirect를 활용할 수 있다.
+
+```
+https://github.com/7saval/writingAI/releases/latest/download/Companion.Writer.Setup.exe
+```
+
+이 URL은 항상 가장 최근 릴리스의 해당 파일명을 가리킨다.
+
+단, 파일명이 릴리스마다 동일해야 한다. `electron-builder`는 기본적으로 버전 번호를 파일명에 포함하므로, `artifactName` 옵션으로 고정할 수 있다.
+
+`package.json` `build.win` 설정에 추가:
+
+```json
+"win": {
+  "target": "nsis",
+  "icon": "build/icon.ico",
+  "artifactName": "Companion.Writer.Setup.exe"
+}
+```
+
+이렇게 하면 버전과 관계없이 파일명이 항상 `Companion.Writer.Setup.exe`로 고정되고, 헤더 URL도 고정된다.
+
+할 일:
+
+- [ ] `artifactName` 설정 추가
+- [ ] 헤더 URL을 `latest/download` 방식으로 변경
+- [ ] 테스트: 새 버전 릴리스 후 URL이 새 파일을 가리키는지 확인
+
+### 완료 기준
+
+아래 조건이 모두 만족되면 자동 업데이트 완료로 본다.
+
+- `npm version patch` → `npm run electron:build`로 새 버전 `.exe` 생성
+- GitHub Release 업로드 후 기존 앱에서 업데이트 감지
+- "새 버전이 있습니다" 배너 표시
+- "재시작" 클릭 시 새 버전으로 자동 설치
+- 헤더 다운로드 버튼이 항상 최신 버전을 받아옴

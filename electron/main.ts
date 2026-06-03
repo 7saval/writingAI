@@ -8,6 +8,7 @@ import {
   WebContents,
   shell,
 } from "electron";
+import { autoUpdater } from "electron-updater";
 import * as fs from "fs";
 import * as path from "path";
 import { saveDocument } from "./database";
@@ -155,6 +156,11 @@ app.whenReady().then(() => {
 
   createWindow();
 
+  // 패키징된 앱에서만 업데이트 체크 (개발 모드에서는 건너뜀)
+  if (app.isPackaged) {
+    autoUpdater.checkForUpdatesAndNotify();
+  }
+
   const registered = globalShortcut.register("CommandOrControl+Shift+A", () => {
     if (mainWindow) {
       mainWindow.webContents.send("shortcut-pressed", "trigger-ai");
@@ -180,6 +186,16 @@ app.on("window-all-closed", () => {
 
 app.on("will-quit", () => {
   globalShortcut.unregisterAll();
+});
+
+// 업데이트 다운로드 완료 → 렌더러에 알림
+autoUpdater.on("update-downloaded", () => {
+  mainWindow?.webContents.send("update-downloaded");
+});
+
+// 렌더러에서 "업데이트 후 재시작" 요청받기
+ipcMain.handle("restart-to-update", () => {
+  autoUpdater.quitAndInstall();
 });
 
 ipcMain.handle("export-file", async (_event, format, content) => {
