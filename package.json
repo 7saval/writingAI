@@ -26,11 +26,18 @@
     ],
     "win": {
       "target": "nsis",
-      "icon": "build/icon.ico"
+      "icon": "build/icon.ico",
+      "artifactName": "Companion.Writer.Setup.exe"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "7saval",
+      "repo": "writingAI"
     }
   },
   "dependencies": {
     "better-sqlite3": "^12.8.0",
+    "electron-updater": "^6.8.3",
     "http-status-codes": "^2.3.0"
   },
   "devDependencies": {

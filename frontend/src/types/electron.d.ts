@@ -38,6 +38,8 @@ export interface ElectronAPI {
   showNotification: (title: string, body: string) => void;
   onShortcutPressed: (callback: (action: string) => void) => () => void;
   openExternalUrl: (url: string) => Promise<void>;
+  onUpdateDownloaded: (callback: () => void) => void;
+  restartToUpdate: () => Promise<void>;
 }
 
 declare global {

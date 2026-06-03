@@ -12,6 +12,7 @@ import { useAuthUserQuery as useAuthQuery } from "@/hooks/useAuth";
 import { Toaster } from "@/components/ui/sonner";
 import ShowAlert from "@/components/common/alert/ShowAlert";
 import ShowConfirm from "@/components/common/alert/ShowConfirm";
+import UpdateBanner from "@/components/common/UpdateBanner";
 
 const routerConfig = routeList.map((item) => {
   return {
@@ -40,6 +41,7 @@ function App() {
         <ShowAlert />
         <ShowConfirm />
         <Toaster />
+        <UpdateBanner />
       </Sentry.ErrorBoundary>
     </>
   );
