@@ -1499,11 +1499,34 @@ autoUpdater.logger = require("electron-log");
 // ✅ 없어도 동작함. 필요 시 electron-log 설치 후 재추가
 ```
 
+**2. `git push --tags`로 인한 scripts/release.js 스크립트 중단**
+
+**문제**:
+```
+! [rejected] v0.1.2 -> v0.1.2 (already exists)
+Error: Command failed: git push origin HEAD --tags
+```
+`execSync`가 exit code 1을 받아 예외를 던지며 스크립트 전체 중단.
+
+**원인**: `gh release create`가 실행되면서 GitHub에 태그를 자동 생성하는데, 이후 `git push --tags`로 동일 태그를 다시 밀려고 하면 충돌 발생.
+
+**해결**: `scripts/release.js`에서 `--tags` 제거.
+
+```javascript
+// ❌ Before
+run("git push origin HEAD --tags");
+
+// ✅ After — 태그는 gh release create가 이미 생성
+run("git push origin HEAD");
+```
+
+**v0.1.2 영향**: Release 생성 + 파일 업로드 + 브랜치 푸시는 에러 전에 모두 완료. 다음 릴리스부터 정상 종료.
+
 #### 📌 내일 할 일
 
+- [x] `npm run electron:release` 전체 플로우 1회 테스트 (v0.1.2) — git push 에러 수정 후 완료
 - [ ] Electron 앱에서 Google 로그인 → 수동 검증 (Step 10 Manual Verification)
 - [ ] 6단계 기능 검증: 로그인, 프로젝트 작성, 저장, export 동작 확인
-- [ ] `npm run electron:release` 전체 플로우 1회 테스트 (v0.1.2)
 - [ ] macOS 배포
 - [ ] 코드 서명 자동화
 - [ ] CI/CD 기반 자동 빌드
@@ -1524,8 +1547,8 @@ autoUpdater.logger = require("electron-log");
 
 #### 🚨 이슈/질문
 
-- [TODO] `npm run electron:release` 실행 후 헤더 URL이 정상 갱신되는지 실제 검증 필요
-- [TODO] v0.1.1 GitHub Release에서 다운로드 버튼 동작 확인 (웹사이트 배포 후)
+- [RESOLVED] `npm run electron:release` v0.1.2 전체 플로우 성공 ✅
+- [TODO] v0.1.2 GitHub Release에서 다운로드 버튼 동작 확인 (웹사이트 배포 후)
 - [주의] 릴리스 스크립트의 gh 경로가 `C:\Program Files\GitHub CLI\gh.exe`로 하드코딩되어 있음. 다른 환경에서는 경로 수정 필요
 
 #### 📊 진행률

@@ -1082,8 +1082,8 @@ $version = node -p "require('./package.json').version"
   --title "v$version" `
   --notes "업데이트 내용을 여기에 작성"
 
-# 4. git push (현재 브랜치 + 태그 포함)
-git push origin HEAD --tags
+# 4. git push (현재 브랜치만 - 태그는 gh release create가 자동 생성)
+git push origin HEAD
 ```
 
 이 순서로 올리면:

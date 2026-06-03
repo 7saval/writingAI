@@ -30,6 +30,6 @@ run(
   `"${ghPath}" release create "v${version}" "${exeFile}" "release\\latest.yml" --repo 7saval/writingAI --title "v${version}" --notes "v${version}"`
 );
 
-run("git push origin HEAD --tags");
+run("git push origin HEAD"); // 태그는 gh release create가 이미 생성함
 
 console.log(`\n✓ v${version} 릴리스 완료\n`);
