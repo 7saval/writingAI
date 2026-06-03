@@ -1075,15 +1075,15 @@ npm version patch
 # 2. 빌드
 npm run electron:build
 
-# 3. GitHub Release 생성 + .exe 업로드
+# 3. GitHub Release 생성 + .exe + latest.yml 업로드
 $version = node -p "require('./package.json').version"
-gh release create "v$version" "release\Companion.Writer.Setup.$version.exe" `
+& "C:\Program Files\GitHub CLI\gh.exe" release create "v$version" "release\Companion.Writer.Setup.exe" "release\latest.yml" `
   --repo 7saval/writingAI `
   --title "v$version" `
   --notes "업데이트 내용을 여기에 작성"
 
-# 4. git push (태그 포함)
-git push origin main --tags
+# 4. git push (현재 브랜치 + 태그 포함)
+git push origin HEAD --tags
 ```
 
 이 순서로 올리면:
@@ -1095,7 +1095,7 @@ git push origin main --tags
 할 일:
 
 - [x] gh CLI 설치 (`winget install --id GitHub.cli`)
-- [ ] `gh auth login`으로 인증
+- [x] `gh auth login`으로 인증
 - [ ] 위 릴리스 워크플로우 1회 테스트
 
 ### Step 9. 헤더 다운로드 URL 버전 관리
