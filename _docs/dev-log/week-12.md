@@ -1346,3 +1346,199 @@ Week 12: ████████████ 100%+ (Day 4/7)
 전체: ████████████ 87%+ (Week 12/14)
 
 ---
+
+### 📅 2026-06-03 (Day 80)
+
+#### 🎯 오늘의 목표
+
+- [x] 웹사이트 헤더에 Electron 앱 다운로드 버튼 추가
+- [x] GitHub Releases 배포 방식 확정 및 exe 업로드
+- [x] 자동 업데이트 기능 구현 (`electron-updater`)
+- [x] 릴리스 워크플로우 자동화 (`npm run electron:release`)
+
+#### ✅ 완료한 작업
+
+**헤더 다운로드 버튼 추가**
+
+- ✅ `Header.tsx`에 "앱 다운로드" 버튼 추가
+  - `window.electron` 분기로 Electron 앱 내부에서는 버튼 숨김
+  - `Monitor` 아이콘(lucide-react) + `Button asChild` 패턴으로 `<a>` 태그와 결합
+  - GitHub Releases 다운로드 URL로 직접 연결
+
+**GitHub Releases 배포 파이프라인 구축**
+
+- ✅ `artifactName: "Companion.Writer.Setup.${version}.${ext}"` 설정
+  - 버전 포함 파일명으로 사용자가 다운받은 파일에서 버전 확인 가능
+  - `${ext}`는 electron-builder가 빌드 타깃(nsis → exe)에 따라 자동 주입하는 템플릿 변수
+- ✅ `package.json`에 `publish.provider: github` 설정 추가
+  - `owner: "7saval"`, `repo: "writingAI"` 지정
+  - electron-builder가 `latest.yml`을 올바른 형식으로 생성하기 위해 필수
+- ✅ gh CLI 설치 및 인증 (`winget install --id GitHub.cli`)
+- ✅ v0.1.1 GitHub Release 생성 + `.exe` + `latest.yml` 업로드 완료
+
+**자동 업데이트 구현 (`electron-updater`)**
+
+- ✅ `electron-updater` 설치 및 `main.ts`에 `autoUpdater` 연동
+  - `app.isPackaged` 가드로 개발 모드에서는 업데이트 체크 건너뜀
+  - `update-downloaded` 이벤트 → 렌더러에 IPC 전달
+  - `restart-to-update` IPC 핸들러 추가
+- ✅ `preload.ts`에 `onUpdateDownloaded`, `restartToUpdate` 노출
+- ✅ `electron.d.ts` 타입 선언 추가
+- ✅ `UpdateBanner.tsx` 컴포넌트 생성
+  - 업데이트 감지 시 화면 하단 고정 배너 표시
+  - "지금 재시작" 클릭 → `restartToUpdate()` 호출
+  - `window.electron` 존재 시에만 렌더링 (웹에서는 노출 안 됨)
+- ✅ `App.tsx`에 `<UpdateBanner />` 추가
+
+**릴리스 워크플로우 자동화**
+
+- ✅ `npm run electron:release` 스크립트 추가
+- ✅ `scripts/release.js` 작성
+  - `Header.tsx` 다운로드 URL을 새 버전으로 자동 교체 (정규식 replace)
+  - git commit 자동 생성 (`chore: update download URL to vX.X.X`)
+  - gh CLI로 GitHub Release 생성 + `.exe` + `latest.yml` 업로드
+  - `git push origin HEAD --tags`로 현재 브랜치 + 태그 푸시
+
+#### 💡 배운 것
+
+**electron-updater 동작 원리**
+
+```
+앱 실행
+  → autoUpdater.checkForUpdatesAndNotify()
+  → GitHub Releases API 조회
+  → latest.yml 파싱 (version, sha512, url)
+  → 현재 앱 버전과 비교
+  → 새 버전 있으면 백그라운드 다운로드
+  → 다운로드 완료 → "update-downloaded" 이벤트 발생
+  → 사용자에게 알림 → 재시작 시 새 버전 설치
+```
+
+`latest.yml`이 electron-builder 빌드 시 자동 생성되며, GitHub Releases에 이 파일이 업로드되어야 기존 앱이 새 버전을 감지할 수 있다. **`.exe`만 올리면 자동 업데이트 미동작** — `latest.yml`을 반드시 같이 업로드해야 함.
+
+**`app.isPackaged` 가드를 사용하는 이유**
+
+```typescript
+// ❌ 가드 없을 때
+app.whenReady().then(() => {
+  autoUpdater.checkForUpdatesAndNotify(); // 개발 모드에서 GitHub API 호출
+  // → 개발 서버 환경에서 에러 발생 또는 불필요한 네트워크 요청
+});
+
+// ✅ 가드 적용
+if (app.isPackaged) {
+  autoUpdater.checkForUpdatesAndNotify(); // 패키징된 앱에서만 실행
+}
+```
+
+`app.isPackaged`는 `npm run electron:dev`(개발) → `false`, 실제 설치된 앱 → `true`를 반환한다. 개발 중에는 GitHub Releases에 현재 버전이 없어 에러가 발생하거나, 실제로 업데이트가 없어도 불필요한 요청이 발생할 수 있어 가드가 필수다.
+
+**GitHub Releases vs Issues/PR 첨부 파일 제한 차이**
+
+| 위치                | 파일 크기 제한 | 파일 타입 제한         |
+| ------------------- | -------------- | ---------------------- |
+| Issues/PR 첨부      | 25MB           | 이미지, 문서 등 한정   |
+| **GitHub Releases** | **2GB**        | **모든 바이너리 가능** |
+
+`.exe` 업로드 시 "We don't support that file type" 또는 "25MB exceeded" 에러가 나면 Issues 첨부 영역에 올리고 있는 것. Releases 전용 페이지(`/releases/new`)의 "Attach binaries" 영역에서만 바이너리 업로드 가능.
+
+**`artifactName` 전략 비교**
+
+| 방식                      | 예시                                       | 장점                    | 단점                      |
+| ------------------------- | ------------------------------------------ | ----------------------- | ------------------------- |
+| 고정 파일명               | `Companion.Writer.Setup.exe`               | 헤더 URL 영구 고정      | 파일명에서 버전 확인 불가 |
+| 버전 포함                 | `Companion.Writer.Setup.0.1.1.exe`         | 사용자가 버전 즉시 확인 | 릴리스마다 URL 갱신 필요  |
+| **버전 포함 + 자동 갱신** | `Companion.Writer.Setup.${version}.${ext}` | 두 장점 모두            | `scripts/release.js` 필요 |
+
+최종 선택: **버전 포함 + `release.js`에서 Header.tsx 자동 갱신**. VS Code, Notion 등 주요 앱이 버전을 파일명에 포함하며, 사용자 경험상 자신이 받은 버전을 파일명에서 확인할 수 있는 것이 자연스럽다.
+
+**npm version patch의 전제 조건**
+
+```bash
+# ❌ 실패: 워킹 트리에 변경사항이 있을 때
+npm version patch
+# → "npm error Git working directory not clean."
+
+# ✅ 성공: 커밋 후 실행
+git add -A
+git commit -m "feat: ..."
+npm version patch  # package.json version 증가 + git commit + git tag 자동 생성
+```
+
+`npm version patch`는 내부적으로 `git commit`을 생성하기 때문에 워킹 트리가 클린해야 한다. `electron:release` 스크립트 실행 전 항상 변경사항을 커밋해야 하는 이유.
+
+**gh CLI PATH 문제 (Windows winget 설치 후)**
+
+winget으로 설치해도 이미 열려 있는 PowerShell 창에는 PATH가 반영되지 않는다. 새 창을 열어도 안 되는 경우는 시스템 환경변수에 경로가 제대로 등록되지 않은 것. 빠른 해결책은 전체 경로 직접 사용:
+
+```powershell
+& "C:\Program Files\GitHub CLI\gh.exe" release create ...
+```
+
+영구 해결:
+
+```powershell
+[Environment]::SetEnvironmentVariable("PATH", $env:PATH + ";C:\Program Files\GitHub CLI", "User")
+# 이후 새 PowerShell에서 gh 명령어 인식
+```
+
+#### 🔧 해결한 문제
+
+**1. `autoUpdater.logger = require("electron-log")` 런타임 에러 위험**
+
+**문제**: `electron-log` 패키지 미설치 상태에서 `require("electron-log")` → 앱 실행 시 `MODULE_NOT_FOUND` 에러
+
+**원인**: 로깅 목적으로 추가한 코드인데 `electron-log`가 `dependencies`에 없었음
+
+**해결**: 해당 라인 제거. `electron-updater`는 로거 없이도 정상 동작하며, 로깅은 선택 사항.
+
+```typescript
+// ❌ 제거
+autoUpdater.logger = require("electron-log");
+
+// ✅ 없어도 동작함. 필요 시 electron-log 설치 후 재추가
+```
+
+#### 📌 내일 할 일
+
+- [ ] Electron 앱에서 Google 로그인 → 수동 검증 (Step 10 Manual Verification)
+- [ ] 6단계 기능 검증: 로그인, 프로젝트 작성, 저장, export 동작 확인
+- [ ] `npm run electron:release` 전체 플로우 1회 테스트 (v0.1.2)
+- [ ] macOS 배포
+- [ ] 코드 서명 자동화
+- [ ] CI/CD 기반 자동 빌드
+- [ ] **Step 5 진행**: 에러 처리 개선
+  - 일관된 에러 응답 패턴 구현
+  - 토큰 만료 시간 로직 명확화
+  - 에러 로그 개선
+
+- [ ] **Step 6 진행**: CORS 보안 강화 (필요시)
+  - process.env.CORS_ORIGIN 설정 확인
+  - credentials, methods, allowedHeaders 옵션 추가
+
+- [ ] **테스트 계획**
+  - ✅ 보호된 엔드포인트 인증 테스트
+  - ✅ 다른 사용자 리소스 접근 시 403 Forbidden 응답 확인
+  - [ ] 자신의 리소스 접근/수정/삭제 정상 작동 확인
+  - [ ] 입력 검증 테스트 (빈 필드, 길이 제한 등)
+
+#### 🚨 이슈/질문
+
+- [TODO] `npm run electron:release` 실행 후 헤더 URL이 정상 갱신되는지 실제 검증 필요
+- [TODO] v0.1.1 GitHub Release에서 다운로드 버튼 동작 확인 (웹사이트 배포 후)
+- [주의] 릴리스 스크립트의 gh 경로가 `C:\Program Files\GitHub CLI\gh.exe`로 하드코딩되어 있음. 다른 환경에서는 경로 수정 필요
+
+#### 📊 진행률
+
+Electron 배포 파이프라인: ██████████ 100% (빌드 → GitHub Releases → 자동 업데이트 → 워크플로우 자동화)
+
+- ✅ electron:build로 설치 파일 생성
+- ✅ GitHub Releases 업로드 및 다운로드 URL 연결
+- ✅ electron-updater 자동 업데이트 구현
+- ✅ UpdateBanner 컴포넌트
+- ✅ npm run electron:release 한 줄 워크플로우
+
+Week 12: ████████████ 100%+ (Day 5/7)  
+전체: ████████████ 90%+ (Week 12/14)
+
+---
