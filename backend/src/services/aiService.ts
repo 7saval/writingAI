@@ -30,6 +30,33 @@ interface GenerationOptions {
   signal?: AbortSignal;
 }
 
+const GENRE_PROMPTS: Record<string, string> = {
+  판타지: `You are a Korean-language fantasy novel writing assistant. Produce vivid, atmospheric descriptions, rich world-building, and immersive magical elements. Maintain internal logic for magic systems, geography, and character motivations.`,
+  로맨스: `You are a Korean-language romance novel writing assistant. Focus on emotional nuance, character chemistry, unspoken tension, and internal conflict.`,
+  미스터리: `You are a Korean-language mystery novel writing assistant. Maintain suspense, subtle clue placement, and logical plot progression.`,
+  스릴러: `You are a Korean-language thriller novel writing assistant. Emphasize tension, pace, and psychological pressure.`,
+  SF: `You are a Korean-language science fiction novel writing assistant. Use sharp, clean prose with grounded scientific plausibility.`,
+  호러: `You are a Korean-language horror novel writing assistant. Prioritize dread, atmosphere, sensory discomfort, and slow-burning fear.`,
+  드라마: `You are a Korean-language drama novel writing assistant. Focus on relationships, emotional growth, conflicts, and personal stakes.`,
+  기타: `You are a Korean-language creative writing assistant for novels of any genre. Adapt your tone, pacing, and style according to the user's intent.`,
+};
+
+const GENRE_MAP: Record<string, string> = {
+  Fantasy: "판타지",
+  Romance: "로맨스",
+  Mystery: "미스터리",
+  Thriller: "스릴러",
+  SciFi: "SF",
+  Horror: "호러",
+  Drama: "드라마",
+};
+
+export function buildSystemPrompt(genre?: string): string {
+  const koreanGenre = genre ? GENRE_MAP[genre] || genre : "기타";
+  const genrePrompt = GENRE_PROMPTS[koreanGenre] || GENRE_PROMPTS["기타"];
+  return `${BASE_PROMPT}\n\n[Genre Specific Guide]\n${genrePrompt}`;
+}
+
 function prepareFinalMessages(
   project: Project,
   paragraphs: Paragraph[],
@@ -43,33 +70,9 @@ function prepareFinalMessages(
     stage: options?.stage,
   });
 
-  const genrePrompts: Record<string, string> = {
-    판타지: `You are a Korean-language fantasy novel writing assistant. Produce vivid, atmospheric descriptions, rich world-building, and immersive magical elements. Maintain internal logic for magic systems, geography, and character motivations.`,
-    로맨스: `You are a Korean-language romance novel writing assistant. Focus on emotional nuance, character chemistry, unspoken tension, and internal conflict.`,
-    미스터리: `You are a Korean-language mystery novel writing assistant. Maintain suspense, subtle clue placement, and logical plot progression.`,
-    스릴러: `You are a Korean-language thriller novel writing assistant. Emphasize tension, pace, and psychological pressure.`,
-    SF: `You are a Korean-language science fiction novel writing assistant. Use sharp, clean prose with grounded scientific plausibility.`,
-    호러: `You are a Korean-language horror novel writing assistant. Prioritize dread, atmosphere, sensory discomfort, and slow-burning fear.`,
-    드라마: `You are a Korean-language drama novel writing assistant. Focus on relationships, emotional growth, conflicts, and personal stakes.`,
-    기타: `You are a Korean-language creative writing assistant for novels of any genre. Adapt your tone, pacing, and style according to the user's intent.`,
-  };
-
-  const genreMap: Record<string, string> = {
-    Fantasy: "판타지",
-    Romance: "로맨스",
-    Mystery: "미스터리",
-    Thriller: "스릴러",
-    SciFi: "SF",
-    Horror: "호러",
-    Drama: "드라마"
-  };
-
-  const koreanGenre = project.genre ? genreMap[project.genre] || project.genre : "기타";
-  const genrePrompt = genrePrompts[koreanGenre] || genrePrompts["기타"];
-
   const systemMessage: OpenAI.Chat.ChatCompletionMessageParam = {
     role: "system",
-    content: `${BASE_PROMPT}\n\n[Genre Specific Guide]\n${genrePrompt}`,
+    content: buildSystemPrompt(project.genre),
   };
 
   const finalMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [

@@ -3,7 +3,8 @@ import { AppDataSource } from "../data-source";
 import { Project } from "../entity/Projects";
 import { Paragraph } from "../entity/Paragraphs";
 import { StatusCodes } from "http-status-codes";
-import { generateNextParagraph, generateNextParagraphStream } from "../services/aiService";
+import { generateNextParagraphStream } from "../services/aiService";
+import { runWritingGraph } from "../services/langgraph";
 
 export async function writeWithAi(
   req: Request,
@@ -40,9 +41,8 @@ export async function writeWithAi(
     await paragraphRepo.save(userParagraph);
 
     console.log("Before AI:", project, project.paragraphs);
-    // 2. AI가 다음 단락 생성
-    // 프론트엔드에서 보낸 prompt(지시사항)와 stage(집필 단계)를 함께 전달
-    const aiText = await generateNextParagraph(
+    // 2. AI가 다음 단락 생성 (LangGraph 파이프라인)
+    const aiText = await runWritingGraph(
       project,
       [...project.paragraphs, userParagraph],
       {
