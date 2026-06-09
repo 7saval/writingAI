@@ -11,7 +11,6 @@
 - [x] 상태 정의(`state.ts`) 작성 — Phase 2-9 확장 필드 포함
 - [x] 기초 그래프 노드 구현 — `buildContext`, `generateContent`
 - [x] 기존 `writeWithAi` 컨트롤러를 LangGraph 파이프라인으로 교체
-- [x] TypeScript 타입체크 통과 확인
 
 #### ✅ 완료한 작업
 
@@ -61,13 +60,13 @@ LangGraph JS에서 상태를 정의하는 두 가지 패턴:
 ```typescript
 // Pattern 1: 단순 LastValue (no default, 항상 invoke 시 제공)
 const StateAnnotation = Annotation.Root({
-  field: Annotation<string>,   // 인자 없이 참조 → () => LastValue<string> 팩토리
+  field: Annotation<string>, // 인자 없이 참조 → () => LastValue<string> 팩토리
 });
 
 // Pattern 2: 커스텀 reducer + default (내부 상태에 적합)
 const StateAnnotation = Annotation.Root({
   field: Annotation<string[]>({
-    reducer: (_, next: string[]) => next,  // 덮어쓰기
+    reducer: (_, next: string[]) => next, // 덮어쓰기
     default: () => [],
   }),
 });
@@ -95,7 +94,7 @@ rawMessages.map((msg) => {
   return msg.role === "assistant"
     ? new AIMessage(content)
     : new HumanMessage(content);
-})
+});
 ```
 
 - `system` role은 별도로 `new SystemMessage(...)` 추가
@@ -121,7 +120,7 @@ const overwrite = <T>(_: T, next: T) => next;
 
 ```typescript
 export async function buildContextNode(
-  state: WritingState
+  state: WritingState,
 ): Promise<Partial<WritingState>> {
   // contextMessages만 업데이트, 나머지 필드는 그대로
   return { contextMessages };
