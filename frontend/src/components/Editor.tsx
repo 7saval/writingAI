@@ -2,10 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import EditorHeader, { EditorHeaderBookmark } from "@/components/EditorHeader";
 import ParagraphItem from "@/components/ParagraphItem";
-import {
-  VariantSelector,
-  VariantSelectorSkeleton,
-} from "@/components/VariantSelector";
+import { VariantSelector } from "@/components/VariantSelector";
 import { ExportDialog } from "@/features/export/components/ExportDialog";
 import type { ExportDialogValue } from "@/features/export/types";
 import { buildExportDocument } from "@/features/export/utils/buildExportDocument";
