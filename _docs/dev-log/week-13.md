@@ -113,12 +113,85 @@
   - `useGenerateVariantsMutation()` — non-streaming fallback
   - `useSelectVariantMutation()` — 선택 확정
 
-**코드 중복 제거**
+**코드 중복 제거 (SSE 공통화)**
 
-- ✅ `backend/src/utils/sseHelpers.ts` — `initSseResponse()` 공통화
-  - 백엔드 SSE 헤더 설정 + `send()` 클로저 반환
-- ✅ `frontend/src/lib/sseClient.ts` — `fetchSsePost()` 공통화
-  - auth 헤더, fetch, reader, 파싱 루프 통합
+공통화 전에는 `writeWithAiStream`(기존 단락 스트리밍)과 `generateVariantsStreamController`(변형 스트리밍) 두 컨트롤러에 SSE 헤더 설정 코드가 그대로 복사되어 있었고, 프론트엔드도 `writeParagraphStream`과 `generateVariantsStream`에 fetch + reader 루프가 중복 존재했다.
+
+**`backend/src/utils/sseHelpers.ts`** (신규)
+
+```typescript
+import { Response } from "express";
+
+export function initSseResponse(res: Response): (data: object) => void {
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  return (data: object) => res.write(`data: ${JSON.stringify(data)}\n\n`);
+}
+```
+
+- SSE에 필요한 3개 헤더 설정을 한 곳에서 처리
+- `send(data)` 클로저를 반환해 호출부에서 `send({ type: "chunk", ... })` 형태로 일관되게 사용
+- `writeWithAiStream`, `generateVariantsStreamController` 양쪽에서 import하여 사용
+
+**`frontend/src/lib/sseClient.ts`** (신규)
+
+```typescript
+import { useAuthStore } from "@/store/authStore";
+
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+
+export async function fetchSsePost(
+  path: string,
+  body: object,
+  onEvent: (event: Record<string, any>) => void,
+): Promise<void> {
+  const accessToken = useAuthStore.getState().accessToken;
+
+  const response = await fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error("Response body is not readable");
+
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split(/\r?\n/);
+    buffer = lines[lines.length - 1]; // 마지막 미완성 라인은 다음 청크로 이월
+
+    for (let i = 0; i < lines.length - 1; i++) {
+      const line = lines[i].trim();
+      if (!line.startsWith("data: ")) continue;
+      try {
+        onEvent(JSON.parse(line.substring(6)));
+      } catch (e) {
+        console.error("Failed to parse SSE event:", line, e);
+      }
+    }
+  }
+}
+```
+
+- `useAuthStore`에서 토큰을 꺼내 Authorization 헤더 자동 주입 (기존 각 함수에서 직접 했던 작업)
+- `fetch` + `getReader()` + `TextDecoder` + 버퍼링 파싱 루프를 한 번만 구현
+- `\r?\n` 분리로 CRLF/LF 모두 처리
+- 마지막 라인을 `buffer`에 이월해 청크 경계에서 잘린 이벤트 안전 처리
+- `onEvent` 콜백만 바꿔 끼우면 어떤 SSE 엔드포인트에도 재사용 가능
+- `writeParagraphStream`, `generateVariantsStream` 양쪽에서 import하여 각 함수가 ~15줄로 축소 (공통화 전 ~50줄)
 
 #### 💡 배운 것
 

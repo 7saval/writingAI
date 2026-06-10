@@ -41,30 +41,86 @@
 
 ```
 writingAI/
-├── backend/                    # Express API 서버
-│   ├── src/
-│   │   ├── index.ts           # 서버 진입점
-│   │   ├── data-source.ts     # TypeORM 설정
-│   │   ├── entity/            # 데이터베이스 엔티티
-│   │   ├── controllers/       # 비즈니스 로직
-│   │   ├── routes/            # API 라우트
-│   │   ├── services/          # 서비스 (AI 통합)
-│   │   ├── middleware/        # 미들웨어 (에러 처리)
-│   │   └── migrations/        # DB 마이그레이션
-│   └── package.json
+├── electron/                        # Electron 데스크톱 앱
+│   ├── main.ts                      # 메인 프로세스 (BrowserWindow 관리)
+│   ├── preload.ts                   # 컨텍스트 브릿지 (IPC 노출)
+│   └── database.ts                  # 로컬 SQLite 설정
 │
-├── frontend/                   # React SPA 애플리케이션
-    ├── src/
-    │   ├── main.tsx           # React 진입점
-    │   ├── App.tsx            # 라우터 설정
-    │   ├── pages/             # 페이지 컴포넌트
-    │   ├── components/        # 재사용 가능한 컴포넌트
-    │   ├── api/               # API 클라이언트
-    │   ├── hooks/             # Custom React hooks
-    │   ├── types/             # TypeScript 타입 정의
-    │   └── styles/            # 전역 스타일
-    └── package.json
-
+├── backend/                         # Express API 서버
+│   └── src/
+│       ├── index.ts                 # 서버 진입점
+│       ├── data-source.ts           # TypeORM 데이터소스 설정
+│       ├── entity/                  # TypeORM 엔티티
+│       │   ├── Users.ts
+│       │   ├── Projects.ts
+│       │   ├── Paragraphs.ts
+│       │   └── SocialAccounts.ts
+│       ├── controllers/             # 요청 처리 및 비즈니스 로직
+│       │   ├── authController.ts
+│       │   ├── projectController.ts
+│       │   ├── contextController.ts
+│       │   ├── paragraphController.ts
+│       │   ├── writingController.ts  # 변형 생성·선택 엔드포인트 포함
+│       │   └── desktopGoogleAuthController.ts
+│       ├── routes/                  # API 라우트
+│       ├── services/
+│       │   ├── aiService.ts         # GPT-4o-mini 직접 호출 (스트리밍 포함)
+│       │   ├── variantSessionStore.ts  # 변형 인메모리 세션 (TTL 5분)
+│       │   ├── desktopOAuthSessions.ts
+│       │   └── langgraph/           # LangGraph AI 파이프라인
+│       │       ├── state.ts         # WritingStateAnnotation 상태 정의
+│       │       ├── graph.ts         # 노드·엣지 조립 (조건부 루프 포함)
+│       │       ├── index.ts         # runWritingGraph / runVariantsGraph
+│       │       └── nodes/
+│       │           ├── buildContext.ts        # 컨텍스트 메시지 빌드
+│       │           ├── generateContent.ts     # Phase 1 단일 생성
+│       │           ├── generateVariants.ts    # Phase 2 병렬 3변형 생성
+│       │           ├── qualityEvaluator.ts    # Phase 4 LLM-as-Judge 평가
+│       │           ├── basicQualityFilter.ts  # Phase 6 규칙 기반 필터
+│       │           └── loreConsistencyChecker.ts  # Phase 5 설정집 검증
+│       ├── middleware/              # 인증·권한·에러 처리
+│       ├── migrations/              # TypeORM 마이그레이션
+│       ├── types/                   # Express 타입 확장
+│       └── utils/
+│           └── sseHelpers.ts        # SSE 헤더 설정 공통 유틸
+│
+└── frontend/                        # React SPA (웹 & Electron 렌더러)
+    └── src/
+        ├── main.tsx                 # 진입점
+        ├── App.tsx                  # 라우터 설정
+        ├── pages/                   # 라우트 페이지
+        │   ├── Home.tsx
+        │   ├── WritingSession.tsx
+        │   ├── auth/                # 로그인·회원가입·비밀번호 재설정
+        │   └── modal/               # 프로젝트·시놉시스·설정집 모달
+        ├── components/
+        │   ├── Editor.tsx           # 단락 입력 + 변형 선택 UI 통합
+        │   ├── VariantSelector.tsx  # SSE 스트리밍 변형 카드 선택
+        │   ├── ParagraphItem.tsx
+        │   ├── ProjectSidebar.tsx
+        │   ├── StoryContextPanel.tsx
+        │   ├── common/              # Header·Footer·Modal 등 공통 컴포넌트
+        │   ├── auth/                # ProtectedRoute
+        │   ├── layout/
+        │   └── ui/                  # Shadcn/UI 프리미티브
+        ├── features/
+        │   └── export/              # PDF·Word 내보내기 기능
+        ├── hooks/                   # Custom React hooks
+        ├── store/                   # Zustand 전역 상태
+        │   ├── authStore.ts
+        │   ├── useWritingStore.ts
+        │   └── useDialogStore.ts
+        ├── api/                     # Axios 기반 API 클라이언트
+        ├── lib/
+        │   ├── sseClient.ts         # POST SSE fetch 공통 유틸
+        │   ├── electronHelper.ts    # Electron IPC 브릿지 헬퍼
+        │   ├── queryClient.ts
+        │   └── utils.ts
+        ├── constants/               # 장르·카테고리·글쓰기 단계 상수
+        ├── types/
+        │   ├── database.ts          # 공유 TypeScript 타입 정의
+        │   └── electron.d.ts        # Electron window 타입 선언
+        └── utils/                   # 라우트 목록 등 유틸
 ```
 
 ## 빠른 시작
