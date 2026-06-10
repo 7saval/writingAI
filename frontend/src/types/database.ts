@@ -44,3 +44,13 @@ export interface LoreNote {
 
 export type ProjectSynopsis = Pick<Project, "id" | "synopsis">;
 export type ProjectLorebook = Pick<Project, "id" | "lorebook">;
+
+export interface VariantResult {
+  id: string;
+  content: string;
+  temperature: number;
+  label: string;
+  qualityScore?: number;
+  qualityPassed?: boolean;
+  loreWarning?: string;
+}

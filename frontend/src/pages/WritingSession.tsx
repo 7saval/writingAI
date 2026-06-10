@@ -115,7 +115,7 @@ function WritingSession() {
         )}
 
         <div className="flex-1 overflow-hidden">
-          <Editor />
+          <Editor key={projectId} />
         </div>
       </main>
 
