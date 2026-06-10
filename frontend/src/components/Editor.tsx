@@ -2,6 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import EditorHeader, { EditorHeaderBookmark } from "@/components/EditorHeader";
 import ParagraphItem from "@/components/ParagraphItem";
+import {
+  VariantSelector,
+  VariantSelectorSkeleton,
+} from "@/components/VariantSelector";
 import { ExportDialog } from "@/features/export/components/ExportDialog";
 import type { ExportDialogValue } from "@/features/export/types";
 import { buildExportDocument } from "@/features/export/utils/buildExportDocument";
@@ -14,20 +18,42 @@ import { useProjectParagraphsQuery } from "@/hooks/useParagraphs";
 import { useToast } from "@/hooks/useToast";
 import { showAlert } from "@/store/useDialogStore";
 import { useWritingStore } from "@/store/useWritingStore";
-import { writeParagraphStream } from "@/api/writing.api";
-import type { Paragraph } from "@/types/database";
+import {
+  useGenerateVariantsStream,
+  useSelectVariantMutation,
+} from "@/hooks/useWriting";
+import type { Paragraph, VariantResult } from "@/types/database";
+
+const INITIAL_VARIANTS: VariantResult[] = [
+  { id: "A", content: "", temperature: 0.6, label: "정석형" },
+  { id: "B", content: "", temperature: 0.8, label: "균형형" },
+  { id: "C", content: "", temperature: 1.0, label: "창의형" },
+];
+
+interface VariantState {
+  sessionId: string;
+  variants: VariantResult[];
+}
 
 function Editor() {
   const { projectId } = useParams();
   const [paragraphs, setParagraphs] = useState<Paragraph[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  // 스트리밍 상태
+  const [streamVariants, setStreamVariants] = useState<VariantResult[]>([]);
+  const [streamingIds, setStreamingIds] = useState<Set<string>>(new Set());
+  const [isEvaluating, setIsEvaluating] = useState(false);
+  // 선택 가능 상태 (done 이벤트 후)
+  const [variantState, setVariantState] = useState<VariantState | null>(null);
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const { toast } = useToast();
   const { aiDirective, resetAiDirective } = useWritingStore();
+  const generateVariantsStreamFn = useGenerateVariantsStream();
+  const selectVariantMutation = useSelectVariantMutation();
 
   const numericProjectId = Number(projectId);
   const { data: fetchedParagraphs } =
@@ -45,96 +71,99 @@ function Editor() {
       scrollContainerRef.current.scrollTop =
         scrollContainerRef.current.scrollHeight;
     }
-  }, [paragraphs]);
+  }, [paragraphs, variantState]);
 
   const handleSubmit = async () => {
-    if (!input.trim() || !projectId) {
-      return;
-    }
+    if (!input.trim() || !projectId) return;
 
     const userInput = input;
     const currentDirective = aiDirective;
 
     setInput("");
     resetAiDirective();
+    setVariantState(null);
+    setIsEvaluating(false);
+
+    // 3개 카드를 즉시 렌더링 (스트리밍 시작 전)
+    setStreamVariants(INITIAL_VARIANTS.map((v) => ({ ...v })));
+    setStreamingIds(new Set(["A", "B", "C"]));
 
     const tempUserId = -Date.now();
-    const tempAiId = -(Date.now() + 1);
+    setParagraphs((prev) => [
+      ...prev,
+      {
+        id: tempUserId,
+        project_id: numericProjectId,
+        content: userInput,
+        writtenBy: "user",
+        orderIndex: prev.length,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ]);
 
-    const tempUserParagraph: Paragraph = {
-      id: tempUserId,
-      project_id: numericProjectId,
-      content: userInput,
-      writtenBy: "user",
-      orderIndex: paragraphs.length,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
+    await generateVariantsStreamFn(
+      numericProjectId,
+      userInput,
+      {
+        onUserParagraph: (paragraph) => {
+          setParagraphs((prev) =>
+            prev.map((p) => (p.id === tempUserId ? paragraph : p)),
+          );
+        },
+        onChunk: (variantId, content) => {
+          setStreamVariants((prev) =>
+            prev.map((v) =>
+              v.id === variantId ? { ...v, content: v.content + content } : v,
+            ),
+          );
+        },
+        onVariantDone: (variantId) => {
+          setStreamingIds((prev) => {
+            const next = new Set(prev);
+            next.delete(variantId);
+            return next;
+          });
+        },
+        onEvaluating: () => setIsEvaluating(true),
+        onDone: (sessionId, variants) => {
+          setStreamVariants(variants);
+          setStreamingIds(new Set());
+          setIsEvaluating(false);
+          setVariantState({ sessionId, variants });
+        },
+        onError: async (error) => {
+          console.error("Failed to generate variants:", error);
+          setParagraphs((prev) => prev.filter((p) => p.id !== tempUserId));
+          setStreamVariants([]);
+          setStreamingIds(new Set());
+          setIsEvaluating(false);
+          setInput(userInput);
+          await showAlert("AI 단락 생성에 실패했습니다. 다시 시도해 주세요.");
+        },
+      },
+      currentDirective || undefined,
+    );
+  };
 
-    const tempAiParagraph: Paragraph = {
-      id: tempAiId,
-      project_id: numericProjectId,
-      content: "",
-      writtenBy: "ai",
-      orderIndex: paragraphs.length + 1,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      isStreaming: true,
-    };
+  const handleSelectVariant = async (variantId: string) => {
+    if (!variantState || !projectId) return;
 
-    setParagraphs((prev) => [...prev, tempUserParagraph, tempAiParagraph]);
     setIsLoading(true);
 
     try {
-      await writeParagraphStream(
-        numericProjectId,
-        userInput,
-        {
-          onUserParagraph: (paragraph) => {
-            setParagraphs((prev) =>
-              prev.map((p) => (p.id === tempUserId ? paragraph : p))
-            );
-          },
-          onAiStart: (paragraph) => {
-            setParagraphs((prev) =>
-              prev.map((p) =>
-                p.id === tempAiId
-                  ? {
-                      ...p,
-                      ...paragraph,
-                      id: tempAiId, // ID 유지해야 onChunk에서 찾을 수 있음
-                      isStreaming: true,
-                      content: "",
-                    }
-                  : p
-              )
-            );
-          },
-          onChunk: (content) => {
-            setParagraphs((prev) =>
-              prev.map((p) =>
-                p.id === tempAiId ? { ...p, content: p.content + content } : p
-              )
-            );
-          },
-          onDone: (paragraph) => {
-            setParagraphs((prev) =>
-              prev.map((p) =>
-                p.id === tempAiId ? { ...paragraph, isStreaming: false } : p
-              )
-            );
-          },
-          onError: async (error) => {
-            console.error("Failed to write paragraph:", error);
-            setParagraphs((prev) =>
-              prev.filter((p) => p.id !== tempUserId && p.id !== tempAiId)
-            );
-            setInput(userInput);
-            await showAlert("문단 생성에 실패했습니다. 다시 시도해 주세요.");
-          },
-        },
-        currentDirective || undefined,
-      );
+      const { aiParagraph } = await selectVariantMutation.mutateAsync({
+        projectId: numericProjectId,
+        sessionId: variantState.sessionId,
+        variantId,
+      });
+
+      setParagraphs((prev) => [...prev, aiParagraph]);
+      setVariantState(null);
+      setStreamVariants([]);
+    } catch (error) {
+      console.error("Failed to select variant:", error);
+      await showAlert("선택 저장에 실패했습니다. 다시 시도해 주세요.");
     } finally {
       setIsLoading(false);
     }
@@ -208,7 +237,6 @@ function Editor() {
           await exportWordDocument(exportDocument);
         }
       } else if (window.electron) {
-        // Electron PDF는 브라우저 다운로드 대신 메인 프로세스의 hidden window print 흐름으로 보냅니다.
         const filename = buildExportFilename(exportDocument, "pdf");
         const result = await window.electron.savePdfDocument(
           filename,
@@ -226,7 +254,6 @@ function Editor() {
         await exportPdfDocument(exportDocument);
       }
 
-      // 같은 export 액션이라도 웹은 다운로드, Electron은 저장 다이얼로그 기반이라 안내 문구를 나눕니다.
       const isElectron = Boolean(window.electron);
 
       toast({
@@ -257,6 +284,8 @@ function Editor() {
   }
 
   const projectTitle = projectDetail?.title ?? "";
+  const isVariantActive = streamVariants.length > 0;
+  const isBusy = isLoading || isVariantActive;
 
   return (
     <div className="relative flex h-full w-full flex-col">
@@ -285,6 +314,17 @@ function Editor() {
               paragraph={paragraph}
             />
           ))}
+
+          {/* 스트리밍 중 / 선택 대기 UI */}
+          {isVariantActive && (
+            <VariantSelector
+              variants={streamVariants}
+              streamingIds={streamingIds}
+              isEvaluating={isEvaluating}
+              onSelect={handleSelectVariant}
+              isSelecting={isLoading}
+            />
+          )}
         </div>
 
         <div className="shrink-0 border-t border-border p-6">
@@ -293,14 +333,21 @@ function Editor() {
             onChange={(event) => setInput(event.target.value)}
             placeholder="이야기를 이어 써보세요"
             value={input}
+            disabled={isBusy || !!variantState}
           />
           <button
             className="btn-primary mt-4 w-full"
-            disabled={isLoading}
+            disabled={isBusy || !!variantState}
             onClick={handleSubmit}
             type="button"
           >
-            {isLoading ? "AI 작성 중.." : "문단 전송"}
+            {isVariantActive
+              ? variantState
+                ? "버전을 선택해 주세요"
+                : isEvaluating
+                  ? "품질 평가 중..."
+                  : "AI 작성 중..."
+              : "문단 전송"}
           </button>
         </div>
       </section>

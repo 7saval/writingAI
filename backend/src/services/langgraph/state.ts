@@ -9,6 +9,7 @@ export interface VariantResult {
   temperature: number;
   label: string;
   qualityScore?: number;
+  qualityPassed?: boolean;
   loreWarning?: string;
 }
 

@@ -6,7 +6,7 @@ export { writingGraph };
 export type { WritingState, VariantResult } from "./state";
 export { WritingStateAnnotation } from "./state";
 
-export async function runWritingGraph(
+export async function runVariantsGraph(
   project: Project,
   paragraphs: Paragraph[],
   options?: {
@@ -14,8 +14,8 @@ export async function runWritingGraph(
     stage?: string;
     temperature?: number;
     maxTokens?: number;
-  }
-): Promise<string | null> {
+  },
+): Promise<import("./state").VariantResult[]> {
   const result = await writingGraph.invoke({
     project,
     paragraphs,
@@ -29,5 +29,21 @@ export async function runWritingGraph(
     throw new Error(result.error);
   }
 
-  return result.variants?.[0]?.content ?? null;
+  return result.variants ?? [];
+}
+
+// 균형형(B) 우선 선택하는 backward-compat 래퍼
+export async function runWritingGraph(
+  project: Project,
+  paragraphs: Paragraph[],
+  options?: {
+    prompt?: string;
+    stage?: string;
+    temperature?: number;
+    maxTokens?: number;
+  },
+): Promise<string | null> {
+  const variants = await runVariantsGraph(project, paragraphs, options);
+  const selected = variants.find((v) => v.id === "B") ?? variants[0];
+  return selected?.content ?? null;
 }
