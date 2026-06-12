@@ -103,13 +103,15 @@ export async function generateNextParagraph(
 ) {
   const finalMessages = prepareFinalMessages(project, paragraphs, options);
 
-  const response = await client.chat.completions.create({
-    model: "gpt-4o-mini",
-    messages: finalMessages,
-    temperature: options?.temperature ?? 0.8,
-    max_tokens: options?.maxTokens ?? 500,
-    ...(options?.signal && { signal: options.signal }),
-  });
+  const response = await client.chat.completions.create(
+    {
+      model: "gpt-4o-mini",
+      messages: finalMessages,
+      temperature: options?.temperature ?? 0.8,
+      max_tokens: options?.maxTokens ?? 500,
+    },
+    options?.signal ? { signal: options.signal } : undefined,
+  );
 
   return response.choices[0].message.content;
 }
@@ -122,14 +124,16 @@ export async function* generateNextParagraphStream(
 ) {
   const finalMessages = prepareFinalMessages(project, paragraphs, options);
 
-  const stream = await client.chat.completions.create({
-    model: "gpt-4o-mini",
-    messages: finalMessages,
-    temperature: options?.temperature ?? 0.8,
-    max_tokens: options?.maxTokens ?? 500,
-    stream: true,
-    ...(options?.signal && { signal: options.signal }),
-  });
+  const stream = await client.chat.completions.create(
+    {
+      model: "gpt-4o-mini",
+      messages: finalMessages,
+      temperature: options?.temperature ?? 0.8,
+      max_tokens: options?.maxTokens ?? 500,
+      stream: true,
+    },
+    options?.signal ? { signal: options.signal } : undefined,
+  );
 
   for await (const chunk of stream) {
     const content = chunk.choices[0]?.delta?.content;
